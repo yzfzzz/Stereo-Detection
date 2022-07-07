@@ -8,7 +8,7 @@ camera = cv2.VideoCapture(0)#也许你可能要capture两次
 camera.set(cv2.CAP_PROP_FRAME_WIDTH, 2560)#设置分辨率
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)#
 utc = time.time()
-folder = "D:\GDEE\Project\share\data" # 拍照文件目录
+folder = "D:\GDEE\Project\Refer\data" # 拍照文件目录
 
 def shot( frame):
     global counter
