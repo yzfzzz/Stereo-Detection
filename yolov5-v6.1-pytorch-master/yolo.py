@@ -310,7 +310,7 @@ class YOLO(object):
 
             # ---------------------------------------------------------#
 
-            label = '{} {:.2f}'.format(predicted_class, score)
+            label = '{} {:.2f} dis={:.2f}m'.format(predicted_class, score, distance)
             draw = ImageDraw.Draw(image)
             label_size = draw.textsize(label, font)
             label = label.encode('utf-8')
