@@ -23,6 +23,41 @@ import math
 '''
 训练自己的数据集必看注释！
 '''
+
+# --------------------------------------------------------------------- #
+# 左镜头的内参，如焦距
+left_camera_matrix = np.array(
+    [[516.5066236, -1.444673028, 320.2950423], [0, 516.5816117, 270.7881873], [0., 0., 1.]])
+right_camera_matrix = np.array(
+    [[511.8428182, 1.295112628, 317.310253], [0, 513.0748795, 269.5885026], [0., 0., 1.]])
+
+# 畸变系数,K1、K2、K3为径向畸变,P1、P2为切向畸变
+# left_distortion = np.array([[-0.154511565,0.325173292, 0.006934081,0.017466934, -0.340007548]])
+left_distortion = np.array([[-0.046645194, 0.077595167, 0.012476819, -0.000711358, 0]])
+# right_distortion = np.array([[-0.192887524,0.706728768, 0.004233541,0.021340116,-1.175486913]])
+right_distortion = np.array([[-0.061588946, 0.122384376, 0.011081232, -0.000750439, 0]])
+
+# 旋转矩阵
+R = np.array([[0.999911333, -0.004351508, 0.012585312],
+              [0.004184066, 0.999902792, 0.013300386],
+              [-0.012641965, -0.013246549, 0.999832341]])
+# 平移矩阵
+T = np.array([-120.3559901, -0.188953775, -0.662073075])
+size = (640, 480)
+
+R1, R2, P1, P2, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(left_camera_matrix, left_distortion,
+                                                                  right_camera_matrix, right_distortion, size,
+                                                                  R,
+                                                                  T)
+# 校正查找映射表,将原始图像和校正后的图像上的点一一对应起来
+left_map1, left_map2 = cv2.initUndistortRectifyMap(left_camera_matrix, left_distortion, R1, P1, size,
+                                                   cv2.CV_16SC2)
+right_map1, right_map2 = cv2.initUndistortRectifyMap(right_camera_matrix, right_distortion, R2, P2, size,
+                                                     cv2.CV_16SC2)
+
+print(Q)
+# --------------------------------------------------------------------- #
+
 class YOLO(object):
     _defaults = {
         #--------------------------------------------------------------------------#
@@ -33,7 +68,7 @@ class YOLO(object):
         #   验证集损失较低不代表mAP较高，仅代表该权值在验证集上泛化性能较好。
         #   如果出现shape不匹配，同时要注意训练时的model_path和classes_path参数的修改
         #--------------------------------------------------------------------------#
-        "model_path"        : 'model_data/yolov5_s_v6.1.pth',
+        "model_path"        : 'model_data/yolov5_n_v6.1.pth',
         "classes_path"      : 'model_data/coco_classes.txt',
         #---------------------------------------------------------------------#
         #   anchors_path代表先验框对应的txt文件，一般不修改。
@@ -48,25 +83,27 @@ class YOLO(object):
         #------------------------------------------------------#
         #   phi             所使用的YoloV5的版本。n、s、m、l、x
         #------------------------------------------------------#
-        "phi"               : 's',
+        "phi"               : 'n',
         #---------------------------------------------------------------------#
         #   只有得分大于置信度的预测框会被保留下来
         #---------------------------------------------------------------------#
-        "confidence"        : 0.5,
+        "confidence"        : 0.2,
         #---------------------------------------------------------------------#
         #   非极大抑制所用到的nms_iou大小
         #---------------------------------------------------------------------#
-        "nms_iou"           : 0.3,
+        "nms_iou"           : 0.5,
         #---------------------------------------------------------------------#
         #   该变量用于控制是否使用letterbox_image对输入图像进行不失真的resize，
         #   在多次测试后，发现关闭letterbox_image直接resize的效果更好
         #---------------------------------------------------------------------#
-        "letterbox_image"   : True,
+        # "letterbox_image"   : True,
+        "letterbox_image"   : False,
         #-------------------------------#
         #   是否使用Cuda
         #   没有GPU可以设置成False
         #-------------------------------#
         "cuda"              : True,
+        # "cuda"              : False,
     }
 
     @classmethod
@@ -123,39 +160,8 @@ class YOLO(object):
     #   检测图片
     #---------------------------------------------------#
     def detect_image(self, image, crop = False, count = False):
-        # --------------------------------------------------------------------- #
-        # 左镜头的内参，如焦距
-        left_camera_matrix = np.array(
-            [[516.5066236, -1.444673028, 320.2950423], [0, 516.5816117, 270.7881873], [0., 0., 1.]])
-        right_camera_matrix = np.array(
-            [[511.8428182, 1.295112628, 317.310253], [0, 513.0748795, 269.5885026], [0., 0., 1.]])
 
-        # 畸变系数,K1、K2、K3为径向畸变,P1、P2为切向畸变
-        # left_distortion = np.array([[-0.154511565,0.325173292, 0.006934081,0.017466934, -0.340007548]])
-        left_distortion = np.array([[-0.046645194, 0.077595167, 0.012476819, -0.000711358, 0]])
-        # right_distortion = np.array([[-0.192887524,0.706728768, 0.004233541,0.021340116,-1.175486913]])
-        right_distortion = np.array([[-0.061588946, 0.122384376, 0.011081232, -0.000750439, 0]])
-
-        # 旋转矩阵
-        R = np.array([[0.999911333, -0.004351508, 0.012585312],
-                      [0.004184066, 0.999902792, 0.013300386],
-                      [-0.012641965, -0.013246549, 0.999832341]])
-        # 平移矩阵
-        T = np.array([-120.3559901, -0.188953775, -0.662073075])
-        size = (640, 480)
-
-        R1, R2, P1, P2, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(left_camera_matrix, left_distortion,
-                                                                          right_camera_matrix, right_distortion, size,
-                                                                          R,
-                                                                          T)
-        # 校正查找映射表,将原始图像和校正后的图像上的点一一对应起来
-        left_map1, left_map2 = cv2.initUndistortRectifyMap(left_camera_matrix, left_distortion, R1, P1, size,
-                                                           cv2.CV_16SC2)
-        right_map1, right_map2 = cv2.initUndistortRectifyMap(right_camera_matrix, right_distortion, R2, P2, size,
-                                                             cv2.CV_16SC2)
-
-        print(Q)
-        # --------------------------------------------------------------------- #
+        t_sgbm = time.time()
         # -------------------------------------------------------------------------#
         frame = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
@@ -195,7 +201,7 @@ class YOLO(object):
         threeD = cv2.reprojectImageTo3D(disparity, Q, handleMissingValues=True)  # 计算三维坐标数据值
         threeD = threeD * 16
 
-        print(disp.shape)
+        print("sgbm消耗时间= %.4f" % (time.time() - t_sgbm))
         cv2.imshow("depth", disp)
         # threeD[y][x] x:0~640; y:0~480;   !!!!!!!!!!
 
@@ -224,6 +230,8 @@ class YOLO(object):
         #---------------------------------------------------------#
         image_data  = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
 
+        t_yolo = time.time()
+
         with torch.no_grad():
             images = torch.from_numpy(image_data)
             if self.cuda:
@@ -245,6 +253,8 @@ class YOLO(object):
             top_label   = np.array(results[0][:, 6], dtype = 'int32')
             top_conf    = results[0][:, 4] * results[0][:, 5]
             top_boxes   = results[0][:, :4]
+
+        print("yolov5网络消耗时间= %.4f" % (time.time() - t_yolo))
         #---------------------------------------------------------#
         #   设置字体与边框厚度
         #---------------------------------------------------------#

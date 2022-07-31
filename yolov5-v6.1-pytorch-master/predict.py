@@ -1,15 +1,3 @@
-# 鼠标回调函数
-def onmouse_pick_points(event, x, y, flags, param):
-    if event == cv2.EVENT_LBUTTONDOWN:
-        threeD = param
-        print('\n像素坐标 x = %d, y = %d' % (x, y))
-        # print("世界坐标是：", threeD[y][x][0], threeD[y][x][1], threeD[y][x][2], "mm")
-        print("世界坐标xyz 是：", threeD[y][x][0] / 1000.0, threeD[y][x][1] / 1000.0, threeD[y][x][2] / 1000.0, "m")
-
-        distance = math.sqrt(threeD[y][x][0] ** 2 + threeD[y][x][1] ** 2 + threeD[y][x][2] ** 2)
-        distance = distance / 1000.0  # mm -> m
-        print("距离是：", distance, "m")
-
 #-----------------------------------------------------------------------#
 #   predict.py将单张图片预测、摄像头检测、FPS测试和目录遍历检测等功能
 #   整合到了一个py文件中，通过指定mode进行模式的修改。
@@ -34,7 +22,8 @@ if __name__ == "__main__":
     #   'heatmap'           表示进行预测结果的热力图可视化，详情查看下方注释。
     #   'export_onnx'       表示将模型导出为onnx，需要pytorch1.7.1以上。
     #----------------------------------------------------------------------------------------------------------#
-    mode = "predict"
+    # mode = "predict"
+    mode = "video"
     # mode = "dir_predict"
     # mode = "fps"
     #-------------------------------------------------------------------------#
@@ -54,7 +43,7 @@ if __name__ == "__main__":
     #   video_path、video_save_path和video_fps仅在mode='video'时有效
     #   保存视频时需要ctrl+c退出或者运行到最后一帧才会完成完整的保存步骤。
     #----------------------------------------------------------------------------------------------------------#
-    video_path      = 0
+    video_path      = "car.avi"
     video_save_path = ""
     video_fps       = 25.0
     #----------------------------------------------------------------------------------------------------------#
@@ -139,7 +128,7 @@ if __name__ == "__main__":
             fps  = ( fps + (1./(time.time()-t1)) ) / 2
             print("fps= %.2f"%(fps))
             frame = cv2.putText(frame, "fps= %.2f"%(fps), (0, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
+
             cv2.imshow("video",frame)
             c= cv2.waitKey(1) & 0xff 
             if video_save_path!="":
