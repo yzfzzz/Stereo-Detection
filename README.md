@@ -29,13 +29,18 @@
 ## 文件说明
 
 - 💼**BM、SGBM**算法均有C++和Python两个版本
+
 - 📂**tensorrt**：模型部署文件，帧率为20fps
+
 - 📁**yolov5-v6.1-pytorch-master**：未部署前的python代码文件，帧率为5fps
+
 - **stereo_introduce**：双目摄像头基本资料
+
 - 📒**双目视觉资料**：从双目相机的标定（Matlab）到sgbm生成深度图的图文教程
+
 - **stereo_shot.py**：摄像头拍摄代码
 
-
+  
 
 ## 教程
 
@@ -44,6 +49,7 @@
 3. 🍟双目摄像头-立体视觉：https://blog.csdn.net/qq_41204464/category_10766478.html?spm=1001.2014.3001.5482)
 4. CUDA的正确安装/升级/重装/使用方式：https://zhuanlan.zhihu.com/p/520536351
 5. 报错【Could not locate zlibwapi.dll. Please make sure it is in your library path】：https://blog.csdn.net/qq_44224801/article/details/125525721
+6. 🍿windows下 C++ openCV配置及x86编译(傻瓜式教程)：https://blog.csdn.net/qq_37059136/article/details/124165080
 
 
 
