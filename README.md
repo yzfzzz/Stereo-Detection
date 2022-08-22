@@ -1,4 +1,4 @@
-<img src="https://yzfzzz.oss-cn-shenzhen.aliyuncs.com/image/dafafa.drawio%20(5).png" alt="dafafa.drawio (5)" style="zoom: 80%;" />
+<img src="https://yzfzzz.oss-cn-shenzhen.aliyuncs.com/image/dafafa.drawio%20(5)%20(1).png" alt="dafafa.drawio (5) (1)" style="zoom:80%;" />
 
 ## 项目日志
 
@@ -30,7 +30,7 @@
 
 - 💼**BM、SGBM**算法均有C++和Python两个版本
 
-- 📂**tensorrt**：模型部署文件，帧率为20fps
+- 📂**tensorrt**：模型部署文件，帧率为23fps
 
 - 📁**yolov5-v6.1-pytorch-master**：未部署前的python代码文件，帧率为5fps
 
@@ -50,6 +50,8 @@
 4. CUDA的正确安装/升级/重装/使用方式：https://zhuanlan.zhihu.com/p/520536351
 5. 报错【Could not locate zlibwapi.dll. Please make sure it is in your library path】：https://blog.csdn.net/qq_44224801/article/details/125525721
 6. 🍿windows下 C++ openCV配置及x86编译(傻瓜式教程)：https://blog.csdn.net/qq_37059136/article/details/124165080
+7. 树莓派安装pytorch：https://blog.csdn.net/weixin_53798505/article/details/125235377
+8. 树莓派开机自启动：https://blog.csdn.net/TohkaQAQ/article/details/121056564
 
 
 
