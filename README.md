@@ -42,7 +42,17 @@
 
   
 
-## 教程
+## 怎么用？
+
+### 双目相机的标定：https://www.bilibili.com/video/BV1GP41157Ti
+
+### SGBM算法应用(Python版)：https://www.bilibili.com/video/BV1zT411w7oZ
+
+### 在YOLOv5中加入双目测距，实现目标测距：https://www.bilibili.com/video/BV1qG41147ZW
+
+
+
+## 参考资料
 
 1. 🍔YOLOv5 Tensorrt Python/C++部署：https://www.bilibili.com/video/BV113411J7nk/?spm_id_from=333.788.recommend_more_video.-1&vd_source=97aec9e652524c83bb4f4b9481ee059e
 2. 🍞Pytorch 搭建自己的YoloV5目标检测平台Bubbliiiing：https://www.bilibili.com/video/BV1FZ4y1m777?spm_id_from=333.999.0.0

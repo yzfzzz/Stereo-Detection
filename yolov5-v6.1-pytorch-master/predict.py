@@ -11,7 +11,6 @@ from PIL import Image
 from yolo import YOLO
 
 if __name__ == "__main__":
-
     yolo = YOLO()
     #----------------------------------------------------------------------------------------------------------#
     #   mode用于指定测试的模式：
@@ -22,10 +21,7 @@ if __name__ == "__main__":
     #   'heatmap'           表示进行预测结果的热力图可视化，详情查看下方注释。
     #   'export_onnx'       表示将模型导出为onnx，需要pytorch1.7.1以上。
     #----------------------------------------------------------------------------------------------------------#
-    # mode = "predict"
-    mode = "video"
-    # mode = "dir_predict"
-    # mode = "fps"
+    mode = 'video'
     #-------------------------------------------------------------------------#
     #   crop                指定了是否在单张图片预测后对目标进行截取
     #   count               指定了是否进行目标的计数
@@ -92,11 +88,8 @@ if __name__ == "__main__":
                 print('Open Error! Try again!')
                 continue
             else:
-
                 r_image = yolo.detect_image(image, crop = crop, count=count)
                 r_image.show()
-                cv2.waitKey()
-
 
     elif mode == "video":
         capture = cv2.VideoCapture(video_path)
@@ -128,7 +121,7 @@ if __name__ == "__main__":
             fps  = ( fps + (1./(time.time()-t1)) ) / 2
             print("fps= %.2f"%(fps))
             frame = cv2.putText(frame, "fps= %.2f"%(fps), (0, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
+            
             cv2.imshow("video",frame)
             c= cv2.waitKey(1) & 0xff 
             if video_save_path!="":
