@@ -12,6 +12,7 @@
 - [x] 使用C++重构SGBM算法（2022.8.1）
 - [x] 使用TensorRT、C++部署yolov5模型（2022.8.3）
 - [x] 完成项目，帧率至少达到20FPS（2022.8.3）
+- [x] 新增`Jeston nano`部署文件
 
 
 
@@ -39,6 +40,8 @@
 - 📒**双目视觉资料**：从双目相机的标定（Matlab）到sgbm生成深度图的图文教程
 
 - **stereo_shot.py**：摄像头拍摄代码
+
+- 🎁**Jeston nano_tensorrt**：Jeston nano(Linux)部署资料
 
   
 
