@@ -38,7 +38,7 @@ right_map1, right_map2 = cv2.initUndistortRectifyMap(right_camera_matrix, right_
 print(Q)
 
 # ---------------------------------------------------------------------------------------------------------
-#   classes        coco数据集的种类,网络返回‘1’时，对应着person，依次类推
+#   classes        coco数据集的种类,网络返回‘0’时，对应着person，依次类推
 # ---------------------------------------------------------------------------------------------------------
 classes = ('person','bicycle','car','motorbike','aeroplane','bus','train','truck','boat','traffic light',
 'fire hydrant','stop sign','parking meter','bench','bird','cat','dog','horse','sheep','cow','elephant',
