@@ -53,7 +53,7 @@
 
 ### 在YOLOv5中加入双目测距，实现目标测距：https://www.bilibili.com/video/BV1qG41147ZW
 
-
+### Jeston nano部署yolov5，并实现双目测距：https://www.bilibili.com/video/BV15g411Q7ZV
 
 ## 参考资料
 
