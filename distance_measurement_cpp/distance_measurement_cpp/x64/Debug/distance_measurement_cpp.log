@@ -1,9 +1,0 @@
-﻿  stereo_match_algorithm.cpp
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(14,21): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(14,15): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(18,23): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(18,20): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(29,11): warning C4305: “return”: 从“int”到“bool”截断
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(38,11): warning C4305: “return”: 从“int”到“bool”截断
-D:\Code\distance_measurement_cpp\distance_measurement_cpp\stereo_match_algorithm.cpp(46,1): warning C4715: “stereo::MatchAlgorithmBase::readCameraConfig”: 不是所有的控件路径都返回值
-  distance_measurement_cpp.vcxproj -> D:\Code\distance_measurement_cpp\x64\Debug\distance_measurement_cpp.exe
