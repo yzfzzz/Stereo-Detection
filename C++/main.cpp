@@ -1,8 +1,8 @@
 #include <iostream>
 #include <string>
+#include <thread>
 #include "infer.h"
 #include "BYTETracker.h"
-#
 #include "depth_anything.h"
 
 
@@ -33,11 +33,11 @@ int run(char* videoPath){
     cv::VideoWriter writer("result.mp4", VideoWriter::fourcc('m', 'p', '4', 'v'), fps, Size(img_w, img_h* 2 ));
 
     // YOLOv8 predictor
-    std::string trtFile = "../../model/engine/yolov8s_fp16.engine";
+    std::string trtFile = "../../model/engine/yolov8x.engine";
     YoloDetector detector(trtFile, 0, 0.45, 0.01);
 
     // Depth Anything predictor
-    std::string depthTrtFile = "../../model/engine/depth_anything_v2_vits.engine";
+    std::string depthTrtFile = "../../model/engine/depth_anything_v2_vitb_fp16.engine";
     DepthAnything depth_model;
     Logger logger;
     depth_model.init(depthTrtFile, logger);
@@ -58,9 +58,20 @@ int run(char* videoPath){
 
         auto start = std::chrono::system_clock::now();
 
+        // depthinference
+        cv::Mat result_depth;
+        std::thread depth_thread([&]{
+            result_depth = depth_model.predict(img);
+        });
+
         // yolo inference
-        cv::Mat result_depth = depth_model.predict(img);
-        std::vector<Detection> res = detector.inference(img);
+        std::vector<Detection> res;
+        std::thread yolo_thread([&]{
+            res = detector.inference(img);
+        });
+
+        depth_thread.join();
+        yolo_thread.join();
 
         // yolo output format to bytetrack input format, and filter bbox by class id
         std::vector<Object> objects;
