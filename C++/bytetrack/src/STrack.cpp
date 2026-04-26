@@ -1,11 +1,12 @@
 #include "STrack.h"
 
-STrack::STrack(vector<float> tlwh_, float score)
+STrack::STrack(vector<float> tlwh_, float score, int class_id)
 {
 	_tlwh.resize(4);
 	_tlwh.assign(tlwh_.begin(), tlwh_.end());
 
 	is_activated = false;
+	this->class_id = class_id;
 	track_id = 0;
 	state = TrackState::New;
 	

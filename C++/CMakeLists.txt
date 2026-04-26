@@ -43,6 +43,13 @@ file(GLOB_RECURSE SRCS02 ${PROJECT_SOURCE_DIR}/detect/src/*.cpp ${PROJECT_SOURCE
 cuda_add_library(yolo_infer SHARED ${SRCS02})
 target_link_libraries(yolo_infer nvinfer cudart nvonnxparser ${OpenCV_LIBS})
 
+# ============= depth lib =============
+include_directories(${PROJECT_SOURCE_DIR}/depth/include)
+file(GLOB_RECURSE SRCS03 ${PROJECT_SOURCE_DIR}/depth/src/*.cpp)
+add_library(depth SHARED ${SRCS03})
+target_link_libraries(depth cudart nvinfer ${OpenCV_LIBS})
+
+
 # ======== main execute file ========
 add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp)
-target_link_libraries(main bytetrack yolo_infer)
+target_link_libraries(main bytetrack yolo_infer depth)
