@@ -5,7 +5,7 @@ project(yolov8_bytetrack)
 add_definitions(-std=c++11)
 add_definitions(-DAPI_EXPORTS)
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_BUILD_TYPE release)
+set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include_directories("/usr/include/eigen3")
@@ -51,5 +51,6 @@ target_link_libraries(depth cudart nvinfer ${OpenCV_LIBS})
 
 
 # ======== main execute file ========
+include_directories(${PROJECT_SOURCE_DIR}/tools/include)
 add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp)
 target_link_libraries(main bytetrack yolo_infer depth)
