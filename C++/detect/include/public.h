@@ -62,17 +62,17 @@ public:
 };
 
 // get the size in byte of a TensorRT data type
-__inline__ size_t dataTypeToSize(DataType dataType) {
+__inline__ size_t dataTypeToSize(nvinfer1::DataType dataType) {
   switch ((int)dataType) {
-  case int(DataType::kFLOAT):
+  case int(nvinfer1::DataType::kFLOAT):
     return 4;
-  case int(DataType::kHALF):
+  case int(nvinfer1::DataType::kHALF):
     return 2;
-  case int(DataType::kINT8):
+  case int(nvinfer1::DataType::kINT8):
     return 1;
-  case int(DataType::kINT32):
+  case int(nvinfer1::DataType::kINT32):
     return 4;
-  case int(DataType::kBOOL):
+  case int(nvinfer1::DataType::kBOOL):
     return 1;
   default:
     return 4;
@@ -93,17 +93,17 @@ __inline__ std::string shapeToString(nvinfer1::Dims dim) {
 }
 
 // get the string of a TensorRT data type
-__inline__ std::string dataTypeToString(DataType dataType) {
+__inline__ std::string dataTypeToString(nvinfer1::DataType dataType) {
   switch (dataType) {
-  case DataType::kFLOAT:
+  case nvinfer1::DataType::kFLOAT:
     return std::string("FP32 ");
-  case DataType::kHALF:
+  case nvinfer1::DataType::kHALF:
     return std::string("FP16 ");
-  case DataType::kINT8:
+  case nvinfer1::DataType::kINT8:
     return std::string("INT8 ");
-  case DataType::kINT32:
+  case nvinfer1::DataType::kINT32:
     return std::string("INT32");
-  case DataType::kBOOL:
+  case nvinfer1::DataType::kBOOL:
     return std::string("BOOL ");
   default:
     return std::string("Unknown");
