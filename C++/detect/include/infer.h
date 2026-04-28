@@ -40,6 +40,9 @@ private:
   float *decodeDevice;
 
   int OUTPUT_CANDIDATES; // 8400: 80 * 80 + 40 * 40 + 20 * 20
+  int yolo26_max_num_output_bbox; // 暂时用于yolo26，后续可以删除
+  int yolo26_num_box_element; // 暂时用于yolo26，后续可以删除
+  bool is_need_nms_ = true;
 };
 
 #endif // INFER_H
