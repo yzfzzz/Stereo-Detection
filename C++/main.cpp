@@ -3,6 +3,8 @@
 #include "infer.h"
 #include "scope_timer.h"
 
+#include <yaml-cpp/yaml.h>
+
 #include <iostream>
 #include <string>
 #include <thread>
@@ -35,15 +37,17 @@ int run(char * videoPath) {
 
     cv::VideoWriter writer("result.mp4", VideoWriter::fourcc('m', 'p', '4', 'v'), fps, Size(img_w, img_h * 2));
 
+    YAML::Node  config         = YAML::LoadFile("config.yaml");
+    std::string yolo_trt_file  = config["yolo_engine"].as<std::string>();
+    std::string depth_trt_file = config["depth_engine"].as<std::string>();
+
     // YOLOv8 predictor
-    std::string  trtFile = "../../model/engine/yolov8s_fp16.engine";
-    YoloDetector detector(trtFile, 0, 0.45, 0.01);
+    YoloDetector detector(yolo_trt_file, 0, 0.45, 0.01);
 
     // Depth Anything predictor
-    std::string   depthTrtFile = "../../model/engine/depth_anything_v2_vits.engine";
     DepthAnything depth_model;
     Logger        logger;
-    depth_model.init(depthTrtFile, logger);
+    depth_model.init(depth_trt_file, logger);
 
     // ByteTrack tracker
     BYTETracker tracker(fps, 30);

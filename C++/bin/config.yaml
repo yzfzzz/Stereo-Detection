@@ -1,0 +1,3 @@
+yolo_engine: "../../model/engine/yolov8s_fp16.engine"
+# yolo_engine: "../../model/engine/yolo26s_fp16.engine"
+depth_engine: "../../model/engine/depth_anything_v2_vits.engine"
