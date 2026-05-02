@@ -1,70 +1,89 @@
 <img src="https://yzfzzz.oss-cn-shenzhen.aliyuncs.com/image/dafafa.drawio%20(5)%20(1).png" alt="dafafa.drawio (5) (1)" style="zoom:80%;" />
 
-## 项目日志
+# Stereo-Detection C++ 部署框架
 
-- [x] 双目相机的标定和初始化（2022.7.3）
-- [x] 运行BM、SGBM算法（2022.7.6）
-- [x] 研究SGBM算法并得出良好的open3d模型（2022.7.15）
-- [x] 实现双目测距（2022.7.27）
-- [x] 双目相机测出Yolov5检测物体的距离（2022.7.29）
-- [x] 视频帧率提高至6FPS（2022.7.30）
-- [x] 使用C++重勾BM算法（2022.8.1）
-- [x] 使用C++重构SGBM算法（2022.8.1）
-- [x] 使用TensorRT、C++部署yolov5模型（2022.8.3）
-- [x] 完成项目，帧率至少达到20FPS（2022.8.3）
-- [x] 新增`Jeston nano`部署文件
+本项目是一个基于 C++ 和 TensorRT 的高性能多任务视觉推理框架。它将 **YOLO 目标检测**、**单目深度估计 (Depth-Anything / Lite-Mono)** 以及 **ByteTrack 多目标跟踪** 结合在一起，并能利用深度变化趋势估算目标的相对运动状态（靠近/远离、加速/减速）。
 
+该框架原生支持在 x86 (例如 RTX 5060) 和 aarch64 (例如 Jetson Nano) 平台上部署，旨在提供端到端的极低延迟实时推理方案。
 
+## 📁 目录结构
 
-## 环境说明
+```text
+C++/
+├── CMakeLists.txt          # 顶层 CMake 构建脚本
+├── main.cpp                # 核心推理串联主程序（音视频 IO、推理流水线、可视化）
+├── bin/                    # 编译产出目录
+│   └── config.yaml         # 各模型 TensorRT Engine 路径及运行配置
+├── bytetrack/              # ByteTrack 多目标跟踪算法的 C++ 实现
+├── core/                   # 核心计算与通用 CUDA Kernel (如前处理加速)
+├── depth/                  # 深度估计模型（Depth-Anything & Lite-Mono）的 TensorRT 实现
+├── detect/                 # YOLOv8 目标检测模型的 TensorRT 实现
+└── tools/                  # 通用工具类组件（如 Logger、时间统计、显存监控 GpuMemoryMonitor 等）
+```
 
-- 🔥Tensorrt 8.4
-- 🚀Cuda 11.6.1 Cudnn 8.4.1
-- Opencv 4.5.1
-- Cmake 3.23.3
-- Visual Studio 2017
-- MX350，Windows10
+## ✨ 核心特性
 
+- **多模型并行协同**：整合了 YOLOv8、Depth-Anything 和 Lite-Mono 模型。
+- **TensorRT 加速**：基于 `nvinfer1` API 开发，支持 FP32/FP16/INT8 等多精度引擎的高效推理。
+- **目标运动趋势分析**：通过融合 ByteTrack 的跟踪 ID 与单目深度图，实时计算目标相对于相机的“速度趋势”和“加速度趋势”。
+- **灵活热切换**：通过 `config.yaml` 灵活选择使用的深度模型（Depth-Anything 或 LiteMono）和权重路径。
+- **全方位性能监控**：集成了 `ScopedTimer` 计算各个子模块的耗时，通过基于 NVML 的 `GpuMemoryMonitor` 精确跟踪显存峰值和增量开销。
 
+## 📦 环境依赖
 
-## 文件说明
+在编译与运行之前，请确保系统中已经安装了以下依赖：
 
-- 💼**BM、SGBM**算法均有C++和Python两个版本
+- **C++14 / C++17** 兼容的编译器
+- **CMake** (>= 3.10)
+- **CUDA & cuDNN** 
+- **TensorRT** (建议 8.x 及以上)
+- **OpenCV** (含 OpenCV C++ 开发库)
+- **yaml-cpp** (用于解析配置文件)
+- **NVIDIA Management Library (NVML)** (用于显存监控监测，通常随 NVIDIA 驱动自带)
 
-- 📂**tensorrt**：模型部署文件，帧率为23fps
+## 🚀 编译与构建
 
-- 📁**yolov5-v6.1-pytorch-master**：未部署前的python代码文件，帧率为5fps
+项目采用 CMake 进行构建：
 
-- **stereo_introduce**：双目摄像头基本资料
+```bash
+cd C++
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+```
 
-- 📒**双目视觉资料**：从双目相机的标定（Matlab）到sgbm生成深度图的图文教程
+编译成功后，可执行文件 `main` 会生成在 bin 目录下。
 
-- **stereo_shot.py**：摄像头拍摄代码
+## ⚙️ 配置说明
 
-- 🎁**Jeston nano_tensorrt**：Jeston nano(Linux)部署资料
+在运行前，请确认 `bin/config.yaml` 中的模型路径指向了正确的从 ONNX / PyTorch 转换来的 TensorRT `.engine` 文件：
 
-  
+```yaml
+# bin/config.yaml 示例
+yolo_engine: "../model/engine/yolov8s_fp16.engine"
+depth_engine: "../model/engine/lite_mono_fp16.engine"
+```
 
-## 怎么用？
+## ▶️ 运行项目
 
-### 双目相机的标定：https://www.bilibili.com/video/BV1GP41157Ti
+执行编译出的 `main` 二进制文件，并传入需要处理的视频路径即可：
 
-### SGBM算法应用(Python版)：https://www.bilibili.com/video/BV1zT411w7oZ
+```bash
+cd ../bin
+./main <video_path>
+```
 
-### 在YOLOv5中加入双目测距，实现目标测距：https://www.bilibili.com/video/BV1qG41147ZW
+**例如：**
+```bash
+./main ../../data/3_car.mp4
+```
 
-### Jeston nano部署yolov5，并实现双目测距：https://www.bilibili.com/video/BV15g411Q7ZV
+运行过程中，终端会输出 `fps`、模块耗时及 `NVML` 的显存占用信息；同时程序会在当前目录生成一个带有可视化目标框、跟踪 ID 以及运动状态标签的 `result.mp4` 文件。
 
-## 参考资料
+## 📊 性能表现（参考）
 
-1. 🍔YOLOv5 Tensorrt Python/C++部署：https://www.bilibili.com/video/BV113411J7nk/?spm_id_from=333.788.recommend_more_video.-1&vd_source=97aec9e652524c83bb4f4b9481ee059e
-2. 🍞Pytorch 搭建自己的YoloV5目标检测平台Bubbliiiing：https://www.bilibili.com/video/BV1FZ4y1m777?spm_id_from=333.999.0.0
-3. 🍟双目摄像头-立体视觉：https://blog.csdn.net/qq_41204464/category_10766478.html?spm=1001.2014.3001.5482)
-4. CUDA的正确安装/升级/重装/使用方式：https://zhuanlan.zhihu.com/p/520536351
-5. 报错【Could not locate zlibwapi.dll. Please make sure it is in your library path】：https://blog.csdn.net/qq_44224801/article/details/125525721
-6. 🍿windows下 C++ openCV配置及x86编译(傻瓜式教程)：https://blog.csdn.net/qq_37059136/article/details/124165080
-7. 树莓派安装pytorch：https://blog.csdn.net/weixin_53798505/article/details/125235377
-8. 树莓派开机自启动：https://blog.csdn.net/TohkaQAQ/article/details/121056564
+- 在 RTX 5060 下使用 `YOLOv8` + Lite-Mono，整个推理流水线的模型显存总增量可以控制在 ~200MB 以内，FPS 稳定在 90+。
+- 该显存占用亦极其契合显存受限的边缘设备（如 **Jetson Nano 2GB**），推荐在 Jetson 上使用 INT8/FP16 精度的引擎以获取更好的实时性表现。
 
 
 
