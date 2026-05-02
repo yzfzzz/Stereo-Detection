@@ -1,10 +1,10 @@
 
 #include <chrono>
 #include <iostream>
-#include <map>
 #include <string>
+#include <unordered_map>
 
-std::map<std::string, double> scoped_timers = {
+std::unordered_map<std::string, double> scoped_timers = {
     { "Cap read",               0.0 },
     { "YOLO inference",         0.0 },
     { "Depth inference",        0.0 },
