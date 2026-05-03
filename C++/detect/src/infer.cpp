@@ -26,14 +26,24 @@ YoloDetector::YoloDetector(const std::string trtFile, int gpuId, float nmsThresh
     get_engine();
 
     context = engine->createExecutionContext();
-    // 【修改1】: setBindingDimensions 替换为 setInputShape，并使用张量名 "images"
+    // Set input dimensions - use appropriate API based on platform/TensorRT version
+#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+    // For Jetson Nano (ARM64) and older TensorRT versions
+    context->setBindingDimensions(0, nvinfer1::Dims{
+                                         4, { 1, 3, kInputH, kInputW }
+    });
+
+    // Get output dimensions using binding index
+    nvinfer1::Dims outDims = engine->getBindingDimensions(1);  // [1, 84, 8400]
+#else
+    // For newer TensorRT versions on x86_64
     context->setInputShape("images", nvinfer1::Dims{
                                          4, { 1, 3, kInputH, kInputW }
     });
 
-    // get engine output info
-    // 【修改2】: getBindingDimensions 替换为 getTensorShape + getIOTensorName
+    // Get output dimensions using tensor name
     nvinfer1::Dims outDims = context->getTensorShape(engine->getIOTensorName(1));  // [1, 84, 8400]
+#endif
 
     // yolov8: [1, 30, 8400]
     // yolo26: [1, 300, 6]
@@ -94,8 +104,14 @@ void YoloDetector::get_engine() {
             builder->createNetworkV2(1U << int(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH));
         IOptimizationProfile * profile = builder->createOptimizationProfile();
         IBuilderConfig *       config  = builder->createBuilderConfig();
-        // 【修改3】: setMaxWorkspaceSize 替换为 setMemoryPoolLimit
+        // Set workspace size - use appropriate API based on platform/TensorRT version
+#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+        // For Jetson Nano (ARM64) and older TensorRT versions
+        config->setMaxWorkspaceSize(1 << 30);  // 1 GB
+#else
+        // For newer TensorRT versions on x86_64
         config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1 << 30);  // 1 GB
+#endif
         IInt8Calibrator * pCalibrator = nullptr;
         if (bFP16Mode) {
             config->setFlag(BuilderFlag::kFP16);
@@ -187,10 +203,17 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     // put input on device, then letterbox、bgr to rgb、hwc to chw、normalize.
     preprocess(img, (float *) vBufferD[0], kInputH, kInputW, stream);
 
-    // tensorrt inference
+    // TensorRT inference - use appropriate API based on platform/TensorRT version
+#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+    // For Jetson Nano (ARM64) and older TensorRT versions
+    void* bindings[] = { vBufferD[0], vBufferD[1] };
+    bool status = context->enqueueV2(bindings, stream, nullptr);
+#else
+    // For newer TensorRT versions on x86_64
     context->setTensorAddress("images", vBufferD[0]);
     context->setTensorAddress("output0", vBufferD[1]);
     bool status = context->enqueueV3(stream);
+#endif
     if (!status) {
         std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
         return {};
