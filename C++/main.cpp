@@ -1,6 +1,5 @@
 #include "BYTETracker.h"
 #include "depth_anything.h"
-#include "gpu_monitor.h"
 #include "infer.h"
 #include "lite_mono.h"
 #include "scope_timer.h"
@@ -24,8 +23,6 @@ bool isTrackingClass(int class_id) {
 }
 
 int run(char * videoPath) {
-    GpuMemoryMonitor gpu_monitor;
-    gpu_monitor.PrintMemoryUsage();
     // read video
     std::string      inputVideoPath = std::string(videoPath);
     cv::VideoCapture cap(inputVideoPath);
@@ -46,14 +43,12 @@ int run(char * videoPath) {
     std::string depth_trt_file = config["depth_engine"].as<std::string>();
 
     // YOLOv8 predictor
-    gpu_monitor.PrintMemoryUsage();
+
     YoloDetector detector(yolo_trt_file, 0, 0.45, 0.01);
-    gpu_monitor.PrintMemoryUsage();
 
     std::unique_ptr<BaseDepthModel> depth_model;
     Logger                          logger;
 
-    gpu_monitor.PrintMemoryUsage();
     if (depth_trt_file.find("depth_anything") != std::string::npos) {
         depth_model = std::make_unique<DepthAnything>();
         cout << "Using Depth-Anything depth engine." << endl;
@@ -65,7 +60,6 @@ int run(char * videoPath) {
         return -1;
     }
     depth_model->Init(depth_trt_file, logger);
-    gpu_monitor.PrintMemoryUsage();
 
     // ByteTrack tracker
     BYTETracker tracker(fps, 30);
