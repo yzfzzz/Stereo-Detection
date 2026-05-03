@@ -55,7 +55,7 @@ endif()
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
   message(STATUS "Embed_platform on - Jetson Nano")
   include_directories(/usr/include/aarch64-linux-gnu)
-  link_directories(/usr/lib/aarch64-linux-gnu)
+  link_directories(/usr/lib/aarch64-linux-gnu /usr/local/cuda-10.2/targets/aarch64-linux/lib)
   
   # Jetson Nano specific TensorRT path detection
   if(EXISTS "/usr/local/TensorRT")
