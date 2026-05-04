@@ -4,15 +4,14 @@
 #include <string>
 #include <vector>
 
-const int   kGpuId            = 0;
-const int   kNumClass         = 80;
-const int   kInputH           = 640;
-const int   kInputW           = 640;
+const int kGpuId    = 0;
+const int kNumClass = 80;
+
 const float kNmsThresh        = 0.45f;
 const float kConfThresh       = 0.25f;
-const int         kMaxNumOutputBbox = 1000;  // assume the box outputs no more than kMaxNumOutputBbox boxes that
+const int   kMaxNumOutputBbox = 1000;  // assume the box outputs no more than kMaxNumOutputBbox boxes that
                                        // conf >= kNmsThresh;
-const int         kNumBoxElement    = 7;     // left, top, right, bottom, confidence, class,
+const int   kNumBoxElement    = 7;     // left, top, right, bottom, confidence, class,
                                        // keepflag(whether drop when NMS)
 
 const std::string onnxFile = "../onnx_model/yolov8s.onnx";

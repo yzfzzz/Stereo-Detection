@@ -43,6 +43,9 @@ private:
   int yolo26_max_num_output_bbox; // 暂时用于yolo26，后续可以删除
   int yolo26_num_box_element; // 暂时用于yolo26，后续可以删除
   bool is_need_nms_ = true;
+
+  int input_h;
+  int input_w;
 };
 
 #endif // INFER_H

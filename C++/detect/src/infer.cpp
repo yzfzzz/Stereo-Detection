@@ -7,6 +7,7 @@
 
 #include <NvOnnxParser.h>
 
+#include <cassert>
 #include <fstream>
 #include <iostream>
 
@@ -30,7 +31,7 @@ YoloDetector::YoloDetector(const std::string trtFile, int gpuId, float nmsThresh
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions
     context->setBindingDimensions(0, nvinfer1::Dims{
-                                         4, { 1, 3, kInputH, kInputW }
+                                         4, { 1, 3, input_h, input_w }
     });
 
     // Get output dimensions using binding index
@@ -38,7 +39,7 @@ YoloDetector::YoloDetector(const std::string trtFile, int gpuId, float nmsThresh
 #else
     // For newer TensorRT versions on x86_64
     context->setInputShape("images", nvinfer1::Dims{
-                                         4, { 1, 3, kInputH, kInputW }
+                                         4, { 1, 3, input_h, input_w }
     });
 
     // Get output dimensions using tensor name
@@ -68,7 +69,7 @@ YoloDetector::YoloDetector(const std::string trtFile, int gpuId, float nmsThresh
     }
     // prepare input and output space on device
     vBufferD.resize(2, nullptr);
-    CHECK(cudaMalloc(&vBufferD[0], 3 * kInputH * kInputW * sizeof(float)));
+    CHECK(cudaMalloc(&vBufferD[0], 3 * input_h * input_w * sizeof(float)));
     CHECK(cudaMalloc(&vBufferD[1], outputSize * sizeof(float)));
 
     CHECK(cudaMalloc(&transposeDevice, outputSize * sizeof(float)));
@@ -93,6 +94,19 @@ void YoloDetector::get_engine() {
 
         runtime = createInferRuntime(gLogger);
         engine  = runtime->deserializeCudaEngine(engineString.data(), fsize);
+#if NV_TENSORRT_MAJOR < 10
+        // Define input dimensions
+        auto input_dims = engine->getBindingDimensions(0);
+        input_h         = input_dims.d[2];
+        input_w         = input_dims.d[3];
+#else
+        auto input_dims = engine->getTensorShape(engine->getIOTensorName(0));
+        input_h         = input_dims.d[2];
+        input_w         = input_dims.d[3];
+#endif
+        assert(input_h > 0 && input_w > 0 &&
+               "Input dimensions must be positive! Check engine binding or dynamic shape setting.");
+
         if (engine == nullptr) {
             std::cout << "Failed loading engine!" << std::endl;
             return;
@@ -120,7 +134,7 @@ void YoloDetector::get_engine() {
             config->setFlag(BuilderFlag::kINT8);
             int batchSize = 8;
             pCalibrator =
-                new Int8EntropyCalibrator2(batchSize, kInputW, kInputH, calibrationDataPath.c_str(), cacheFile.c_str());
+                new Int8EntropyCalibrator2(batchSize, input_w, input_h, calibrationDataPath.c_str(), cacheFile.c_str());
             config->setInt8Calibrator(pCalibrator);
         }
 
@@ -139,15 +153,15 @@ void YoloDetector::get_engine() {
         ITensor * inputTensor = network->getInput(0);
         profile->setDimensions(inputTensor->getName(), OptProfileSelector::kMIN,
                                nvinfer1::Dims{
-                                   4, { 1, 3, kInputH, kInputW }
+                                   4, { 1, 3, input_h, input_w }
         });
         profile->setDimensions(inputTensor->getName(), OptProfileSelector::kOPT,
                                nvinfer1::Dims{
-                                   4, { 1, 3, kInputH, kInputW }
+                                   4, { 1, 3, input_h, input_w }
         });
         profile->setDimensions(inputTensor->getName(), OptProfileSelector::kMAX,
                                nvinfer1::Dims{
-                                   4, { 1, 3, kInputH, kInputW }
+                                   4, { 1, 3, input_h, input_w }
         });
         config->addOptimizationProfile(profile);
 
@@ -201,13 +215,13 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     }
 
     // put input on device, then letterbox、bgr to rgb、hwc to chw、normalize.
-    preprocess(img, (float *) vBufferD[0], kInputH, kInputW, stream);
+    preprocess(img, (float *) vBufferD[0], input_h, input_w, stream);
 
     // TensorRT inference - use appropriate API based on platform/TensorRT version
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions
-    void* bindings[] = { vBufferD[0], vBufferD[1] };
-    bool status = context->enqueueV2(bindings, stream, nullptr);
+    void * bindings[] = { vBufferD[0], vBufferD[1] };
+    bool   status     = context->enqueueV2(bindings, stream, nullptr);
 #else
     // For newer TensorRT versions on x86_64
     context->setTensorAddress("images", vBufferD[0]);
@@ -272,7 +286,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     }
 
     for (size_t j = 0; j < vDetections.size(); j++) {
-        scale_bbox(img, vDetections[j].bbox);
+        scale_bbox(img, vDetections[j].bbox, input_w, input_h);
     }
 
     return vDetections;
