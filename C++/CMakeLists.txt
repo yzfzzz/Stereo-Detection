@@ -18,12 +18,12 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_C_FLAGS_RELEASE "-O3 -g -fno-omit-frame-pointer" CACHE STRING "" FORCE)
 endif()
 
-# Prevent linker from stripping symbols in all build types
-set(CMAKE_EXE_LINKER_FLAGS "-Wl,--no-strip-all")
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-strip-all")
-
 # Also preserve symbols in shared libraries
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
+# Explicitly disable stripping
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "")
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "")
 
 # ============= Jetson Nano Optimization Configuration ============
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
@@ -39,8 +39,8 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
     set(CMAKE_BUILD_PARALLEL_LEVEL 2)
   endif()
   
-  # Keep GC sections but prevent symbol stripping for profiling
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections -Wl,--no-strip-all")
+  # Keep GC sections for memory efficiency
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
   
 else()
   message(STATUS "Non-ARM64 platform - using default configuration")
