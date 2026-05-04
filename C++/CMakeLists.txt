@@ -56,7 +56,7 @@ link_directories(/usr/local/cuda/lib64)
 
 # CUDA compilation options with basic debug symbols for profiling
 set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${CUDA_ARCH}")
-set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 --use-fast-math -lineinfo")
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 --use_fast_math -lineinfo")
 
 # Options to reduce VRAM usage for Jetson Nano
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
