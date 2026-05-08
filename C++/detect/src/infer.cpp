@@ -237,6 +237,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
             std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
             return {};
         }
+        cudaStreamSynchronize(stream);
     }
     if (!is_need_nms_) {
         // 走yolo26推理，输出候选框较少，且已经经过nms处理，不需要再做一次nms了
