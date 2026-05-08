@@ -1,7 +1,6 @@
 # yolo_engine: "../../model/engine/yolov8s_fp16.engine"
-yolo_engine: "../../model/engine/yolo26s_fp16.engine"
+yolo_engine: "../../model/engine/yolov8s_s640_ws1024_fp16.engine"
 
-
-# depth_engine: "../../model/engine/depth_anything_v2_vits.engine"
-depth_engine: "../../model/engine/lite_mono_fp16.engine"
+depth_engine: "../../model/engine/lite_mono-8m_op12_s640_ws-all_fp16.engine"
+depth_interval : 2
 # depth_engine: "../../model/engine/depth_anything_v2_metric_vkitti_vits.engine"

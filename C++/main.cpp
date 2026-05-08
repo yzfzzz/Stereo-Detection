@@ -41,6 +41,7 @@ int run(char * videoPath) {
     YAML::Node  config         = YAML::LoadFile("config.yaml");
     std::string yolo_trt_file  = config["yolo_engine"].as<std::string>();
     std::string depth_trt_file = config["depth_engine"].as<std::string>();
+    int         depth_interval = config["depth_interval"].as<int>();  // 可以抽帧估计深度
 
     // YOLOv8 predictor
 
@@ -68,8 +69,7 @@ int run(char * videoPath) {
     int       num_frames = 0;
     long long total_us   = 0;
 
-    const int    depth_interval = 1;    // 可改为 3
-    const double depth_alpha    = 0.7;  // 新深度权重，0.6~0.8 常用
+    const double depth_alpha = 0.7;  // 新深度权重，0.6~0.8 常用
     cv::Mat      cached_depth;
     bool         has_cached_depth = false;
     cv::Mat      result_depth;
