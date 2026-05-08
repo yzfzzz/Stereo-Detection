@@ -1,4 +1,4 @@
-<img src="https://yzfzzz.oss-cn-shenzhen.aliyuncs.com/image/dafafa.drawio%20(5)%20(1).png" alt="dafafa.drawio (5) (1)" style="zoom:80%;" />
+[![GitHub](./doc/product.png)]
 
 # Stereo-Detection C++ 部署框架
 
@@ -28,6 +28,17 @@ C++/
 - **目标运动趋势分析**：通过融合 ByteTrack 的跟踪 ID 与单目深度图，实时计算目标相对于相机的“速度趋势”和“加速度趋势”。
 - **灵活热切换**：通过 `config.yaml` 灵活选择使用的深度模型（Depth-Anything 或 LiteMono）和权重路径。
 - **全方位性能监控**：集成了 `ScopedTimer` 计算各个子模块的耗时，通过基于 NVML 的 `GpuMemoryMonitor` 精确跟踪显存峰值和增量开销。
+
+模块 / 环节    耗时    说明
+
+- Cap read    5.72 ms    视频流 / 摄像头图像读取
+- YOLO inference    61.89 ms    YOLO 目标检测推理
+- ByteTrack    0.55 ms    目标跟踪算法处理
+- Depth inference    108.18 ms    深度估计模型推理
+- Write    132.20 ms    结果写盘 / 视频帧输出保存
+- Draw    8.80 ms    检测框 / 深度图等可视化绘制
+- One frame average time    319.34 ms    单帧处理总平均耗时（含所有环节）
+- Infer Compute FPS    5 FPS    引擎端有效推理帧率
 
 ## 📦 环境依赖
 
@@ -74,6 +85,7 @@ cd ../bin
 ```
 
 **例如：**
+
 ```bash
 ./main ../../data/3_car.mp4
 ```
@@ -84,14 +96,3 @@ cd ../bin
 
 - 在 RTX 5060 下使用 `YOLOv8` + Lite-Mono，整个推理流水线的模型显存总增量可以控制在 ~200MB 以内，FPS 稳定在 90+。
 - 该显存占用亦极其契合显存受限的边缘设备（如 **Jetson Nano 2GB**），推荐在 Jetson 上使用 INT8/FP16 精度的引擎以获取更好的实时性表现。
-
-
-
-
-
-
-
-
-
-
-
