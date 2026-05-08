@@ -30,6 +30,7 @@ class BaseDepthModel {
     nvinfer1::ICudaEngine *       engine;
     nvinfer1::IExecutionContext * context;
     cudaStream_t                  stream;
+    std::string                   io_tensor_name[2]{ "input", "output" };
     void *                        buffer[2]{ nullptr, nullptr };
     int                           input_h, input_w;            // 模型输出的尺寸
     int                           origin_img_w, origin_img_h;  // 原始输入图像的尺寸

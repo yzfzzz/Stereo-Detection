@@ -3,6 +3,7 @@
 #include "calibrator.h"
 #include "postprocess.h"
 #include "preprocess.h"
+#include "scope_timer.h"
 #include "utils.h"
 
 #include <NvOnnxParser.h>
@@ -215,22 +216,27 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     }
 
     // put input on device, then letterbox、bgr to rgb、hwc to chw、normalize.
-    preprocess(img, (float *) vBufferD[0], input_h, input_w, stream);
-
-    // TensorRT inference - use appropriate API based on platform/TensorRT version
+    {
+        ScopedTimer timer("2-1.yolo preprocess");
+        preprocess(img, (float *) vBufferD[0], input_h, input_w, stream);
+    }
+    {
+        ScopedTimer timer("2-2.yolo infer enqueue");
+        // TensorRT inference - use appropriate API based on platform/TensorRT version
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
-    // For Jetson Nano (ARM64) and older TensorRT versions
-    void * bindings[] = { vBufferD[0], vBufferD[1] };
-    bool   status     = context->enqueueV2(bindings, stream, nullptr);
+        // For Jetson Nano (ARM64) and older TensorRT versions
+        void * bindings[] = { vBufferD[0], vBufferD[1] };
+        bool   status     = context->enqueueV2(bindings, stream, nullptr);
 #else
-    // For newer TensorRT versions on x86_64
-    context->setTensorAddress("images", vBufferD[0]);
-    context->setTensorAddress("output0", vBufferD[1]);
-    bool status = context->enqueueV3(stream);
+        // For newer TensorRT versions on x86_64
+        context->setTensorAddress("images", vBufferD[0]);
+        context->setTensorAddress("output0", vBufferD[1]);
+        bool status = context->enqueueV3(stream);
 #endif
-    if (!status) {
-        std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
-        return {};
+        if (!status) {
+            std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
+            return {};
+        }
     }
     if (!is_need_nms_) {
         // 走yolo26推理，输出候选框较少，且已经经过nms处理，不需要再做一次nms了
@@ -240,6 +246,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
                               cudaMemcpyDeviceToHost, stream));
         cudaStreamSynchronize(stream);
     } else {
+        ScopedTimer timer("2-3.yolo nms");
         // 走yolo8推理，输出候选框较多，需要做一次nms处理
         // transpose [1 84 8400] convert to [1 8400 84]
         transpose((float *) vBufferD[1], transposeDevice, OUTPUT_CANDIDATES, numClass_ + 4, stream);

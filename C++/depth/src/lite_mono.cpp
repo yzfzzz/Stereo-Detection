@@ -1,8 +1,9 @@
 #include "lite_mono.h"
-
+#include "scope_timer.h"
 #include <opencv2/core/mat.hpp>
 
 std::vector<float> LiteMono::Preprocess(const cv::Mat & image) {
+    ScopedTimer timer("3-1.LiteMono::Preprocess");
     origin_img_h = image.rows;
     origin_img_w = image.cols;
     cv::Mat resized, rgb;

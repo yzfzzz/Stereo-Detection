@@ -87,7 +87,7 @@ int run(char * videoPath) {
     while (true) {
         ScopedTimer timer_total("One frame average time");
         {
-            ScopedTimer timer("Cap read");
+            ScopedTimer timer("1.Cap read");
             if (!cap.read(img)) {
                 break;
             }
@@ -106,7 +106,7 @@ int run(char * videoPath) {
         // 端侧部署的情况下可以用串行保证端到端低延迟
         // depthinference
         {
-            ScopedTimer timer("Depth inference");
+            ScopedTimer timer("3.Depth inference");
             bool        do_depth = (!has_cached_depth) || ((num_frames - 1) % depth_interval == 0);
             if (do_depth) {
                 std::pair<cv::Mat, cv::Mat> depth_infer_result = depth_model->Predict(img);
@@ -119,7 +119,7 @@ int run(char * videoPath) {
         // yolo inference
         std::vector<Detection> res;
         {
-            ScopedTimer timer("YOLO inference");
+            ScopedTimer timer("2.YOLO inference");
             res = detector.inference(img);
         }
 
@@ -140,7 +140,7 @@ int run(char * videoPath) {
         // track
         std::vector<STrack> output_stracks;
         {
-            ScopedTimer timer("ByteTrack");
+            ScopedTimer timer("4.ByteTrack");
             output_stracks = tracker.update(objects);
         }
 
@@ -149,7 +149,7 @@ int run(char * videoPath) {
 
         // Only for visualization, not required for depth estimation or tracking logic
         {
-            ScopedTimer timer("Draw");
+            ScopedTimer timer("5.Draw");
             for (int i = 0; i < output_stracks.size(); i++) {
                 const std::vector<float> & tlwh = output_stracks[i].tlwh;
                 if (tlwh[2] * tlwh[3] <= 20) {
@@ -262,7 +262,7 @@ int run(char * videoPath) {
 
         // 再做拼接和写盘（只写一次）
         {
-            ScopedTimer timer("Write");
+            ScopedTimer timer("6.Write");
             writer.write(out_frame);
         }
 
@@ -272,8 +272,9 @@ int run(char * videoPath) {
     }
 
     cap.release();
+    std::cout << "==========Summary===========" << endl;
     std::cout << "Infer Engine Compute FPS: " << (total_us > 0 ? (num_frames * 1000000LL / total_us) : 0) << std::endl;
-    for (auto & kv : scoped_timers) {
+    for (auto & kv : ScopedTimer::GetScopedTimers()) {
         std::cout << kv.first << ": " << (kv.second / 1000.0) / num_frames << " ms/frame" << std::endl;
     }
 
