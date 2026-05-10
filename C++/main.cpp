@@ -1,9 +1,12 @@
 #include "BYTETracker.h"
 #include "depth_anything.h"
+#include "display_manager.h"
 #include "infer.h"
 #include "lite_mono.h"
 #include "scope_timer.h"
 
+#include <dlfcn.h>
+#include <sys/stat.h>
 #include <yaml-cpp/yaml.h>
 
 #include <iostream>
@@ -22,6 +25,11 @@ bool isTrackingClass(int class_id) {
     return false;
 }
 
+bool dirExists(const std::string & path) {
+    struct stat info;
+    return stat(path.c_str(), &info) == 0 && (info.st_mode & S_IFDIR);
+}
+
 int run(char * videoPath) {
     // read video
     std::string      inputVideoPath = std::string(videoPath);
@@ -36,15 +44,27 @@ int run(char * videoPath) {
     long nFrame = static_cast<long>(cap.get(CAP_PROP_FRAME_COUNT));
     cout << "Total frames: " << nFrame << endl;
 
-    cv::VideoWriter writer("result.mp4", VideoWriter::fourcc('m', 'p', '4', 'v'), fps, Size(img_w, img_h * 2));
+    YAML::Node  config                   = YAML::LoadFile("config.yaml");
+    std::string yolo_trt_file            = config["yolo_engine"].as<std::string>();
+    std::string depth_trt_file           = config["depth_engine"].as<std::string>();
+    int         depth_interval           = config["depth_interval"].as<int>();
+    std::string mode                     = config["mode"].as<std::string>("release");
+    std::string save_mode                = config["save_mode"].as<std::string>("none");
+    std::string out_dir                  = config["out_dir"].as<std::string>("out_dir");
+    bool        enable_human_interaction = (mode == "debug");
 
-    YAML::Node  config         = YAML::LoadFile("config.yaml");
-    std::string yolo_trt_file  = config["yolo_engine"].as<std::string>();
-    std::string depth_trt_file = config["depth_engine"].as<std::string>();
-    int         depth_interval = config["depth_interval"].as<int>();  // 可以抽帧估计深度
+    if (save_mode == "images" || save_mode == "both") {
+        if (!dirExists(out_dir)) {
+            system(("mkdir -p " + out_dir).c_str());
+        }
+    }
+
+    cv::VideoWriter writer;
+    if (save_mode == "video" || save_mode == "both") {
+        writer.open("result.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(img_w, img_h * 2));
+    }
 
     // YOLOv8 predictor
-
     YoloDetector detector(yolo_trt_file, 0, 0.45, 0.01);
 
     std::unique_ptr<BaseDepthModel> depth_model;
@@ -65,6 +85,9 @@ int run(char * videoPath) {
     // ByteTrack tracker
     BYTETracker tracker(fps, 30);
 
+    // 创建显示管理器（负责窗口管理、显示、鼠标点击等）
+    DisplayManager display_manager(enable_human_interaction);
+
     cv::Mat   img;
     int       num_frames = 0;
     long long total_us   = 0;
@@ -76,13 +99,6 @@ int run(char * videoPath) {
     cv::Mat      depth_vis;
 
     cv::Mat out_frame;
-
-    struct TrackHistory {
-        std::deque<float> depths;      // 保存历史深度值
-        std::deque<float> velocities;  // 保存历史速度(深度差分)
-    };
-
-    std::map<int, TrackHistory> track_history_map;
 
     while (true) {
         ScopedTimer timer_total("One frame average time");
@@ -144,6 +160,9 @@ int run(char * videoPath) {
             output_stracks = tracker.update(objects);
         }
 
+        // 更新显示管理器数据（供鼠标点击查询使用）
+        display_manager.updateData(output_stracks, result_depth);
+
         auto end = std::chrono::system_clock::now();
         total_us += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -176,63 +195,9 @@ int run(char * videoPath) {
                     current_depth = static_cast<float>(result_depth.at<uchar>(cy, cx));
                 }
 
-                // cout << "Track ID: " << track_id << " Class ID: " << class_id << " Depth: " << current_depth << endl;
-
-                // 2. 更新该 target 的历史记录
-                auto & history = track_history_map[track_id];
-                history.depths.push_back(current_depth);
-                if (history.depths.size() > 5) {  // 保留近 5 帧深度
-                    history.depths.pop_front();
-                }
-
-                // 3. 计算速度和加速度趋势
-                float       velocity_trend = 0.0f;
-                float       accel_trend    = 0.0f;
-                std::string motion_status  = "Stable";
-
-                if (history.depths.size() >= 2) {
-                    // 速度 = 当前深度 - 上一帧深度
-                    velocity_trend = history.depths.back() - history.depths[history.depths.size() - 2];
-                    history.velocities.push_back(velocity_trend);
-                    if (history.velocities.size() > 5) {
-                        history.velocities.pop_front();
-                    }
-
-                    if (history.velocities.size() >= 2) {
-                        // 加速度 = 当前速度 - 上一帧速度
-                        accel_trend = history.velocities.back() - history.velocities[history.velocities.size() - 2];
-                    }
-
-                    /* 
-                       分析物理趋势：
-                       注意：DepthAnything和LiteMono 等网络输出的往往是“逆深度 (disparity-like)”：
-                       即：距离越近，像素值越大；距离越远，像素值越小。（请根据实际可视化确认）
-                       如果你的模型是 `值大 = 距离近`，则：
-                       - velocity > 0  => 值在变大 => 正在靠近
-                       - velocity < 0  => 值在变小 => 正在远离
-                    */
-                    float noise_thresh =
-                        5.0f;  // 阈值，用来过滤深度图单帧抖动产生的噪声，需要按你实际的相对深度刻度调整
-
-                    if (velocity_trend > noise_thresh) {
-                        motion_status = "Approaching";
-                    } else if (velocity_trend < -noise_thresh) {
-                        motion_status = "Moving away";
-                    }
-
-                    // 利用加速度判断是否急加速/急减速
-                    if (std::abs(velocity_trend) > noise_thresh && std::abs(accel_trend) > (noise_thresh * 0.5f)) {
-                        if ((velocity_trend > 0 && accel_trend > 0) || (velocity_trend < 0 && accel_trend < 0)) {
-                            motion_status += " (Accel)";  // 正在加速靠近/远离
-                        } else {
-                            motion_status += " (Decel)";  // 正在减速靠近/远离
-                        }
-                    }
-                }
-
                 cv::Scalar  s = tracker.get_color(output_stracks[i].track_id);
                 std::string label =
-                    cv::format("%s #%d [%s]", vClassNames[class_id].c_str(), track_id, motion_status.c_str());
+                    cv::format("%s #%d [Depth: %.2f]", vClassNames[class_id].c_str(), track_id, current_depth);
 
                 int      baseLine   = 0;
                 cv::Size label_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &baseLine);
@@ -260,18 +225,32 @@ int run(char * videoPath) {
             depth_vis.copyTo(out_frame(cv::Rect(0, img.rows, img.cols, depth_vis.rows)));
         }
 
-        // 再做拼接和写盘（只写一次）
-        {
-            ScopedTimer timer("6.Write");
+        // 保存图像或视频
+        if (save_mode == "images" || save_mode == "both") {
+            std::string save_path = out_dir + "/frame_" + std::to_string(num_frames) + ".jpg";
+            cv::imwrite(save_path, out_frame);
+        }
+
+        if (save_mode == "video" || save_mode == "both") {
             writer.write(out_frame);
         }
 
-        // cv::imshow("img", img);
-        // char c = waitKey(1);
-        // if (c > 0) break;
+        // 显示图像（通过 DisplayManager）
+        if (display_manager.isEnabled()) {
+            display_manager.show(out_frame);
+            char c      = display_manager.waitKey(1);
+            int  result = display_manager.handleKey(c);
+            if (result == -404) {
+                break;  // 用户退出
+            }
+        }
     }
 
     cap.release();
+    if (writer.isOpened()) {
+        writer.release();
+    }
+
     std::cout << "==========Summary===========" << endl;
     std::cout << "Infer Engine Compute FPS: " << (total_us > 0 ? (num_frames * 1000000LL / total_us) : 0) << std::endl;
     for (auto & kv : ScopedTimer::GetScopedTimers()) {
