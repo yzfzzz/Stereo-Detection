@@ -128,7 +128,7 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
 
 #endif
 #if defined(ENABLE_TIMER)
-    DEBUG_FUNCTION_RUNNING_TIME_VOID("3-2.DepthModel Infer Sync", cudaStreamSynchronize, stream);
+    DEBUG_FUNCTION_RUNNING_TIME_FUNC("3-2.DepthModel Infer Sync", cudaStreamSynchronize, stream);
 #else
     cudaStreamSynchronize(stream);
 

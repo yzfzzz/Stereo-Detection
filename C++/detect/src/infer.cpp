@@ -218,7 +218,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     // put input on device, then letterbox、bgr to rgb、hwc to chw、normalize.
 #if defined(ENABLE_TIMER)
 
-    DEBUG_FUNCTION_RUNNING_TIME_VOID("2-1.Yolo Preprocess", preprocess, img, (float *) vBufferD[0], input_h, input_w,
+    DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-1.Yolo Preprocess", preprocess, img, (float *) vBufferD[0], input_h, input_w,
                                      stream);
 #else
     preprocess(img, (float *) vBufferD[0], input_h, input_w, stream);
@@ -241,7 +241,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
         return {};
     }
 #if defined(ENABLE_TIMER)
-    DEBUG_FUNCTION_RUNNING_TIME_VOID("2-2.Yolo Infer Sync", cudaStreamSynchronize, stream);
+    DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-2.Yolo Infer Sync", cudaStreamSynchronize, stream);
 #else
     cudaStreamSynchronize(stream);
 #endif
@@ -256,11 +256,11 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     } else {
         // 走yolo8推理，输出候选框较多，需要做一次nms处理
 #if defined(ENABLE_TIMER)
-        DEBUG_FUNCTION_RUNNING_TIME_VOID("2-3.Yolo Transpose", transpose, (float *) vBufferD[1], transposeDevice,
+        DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-3.Yolo Transpose", transpose, (float *) vBufferD[1], transposeDevice,
                                          OUTPUT_CANDIDATES, numClass_ + 4, stream);
-        DEBUG_FUNCTION_RUNNING_TIME_VOID("2-4.Yolo Decode", decode, transposeDevice, decodeDevice, OUTPUT_CANDIDATES,
+        DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-4.Yolo Decode", decode, transposeDevice, decodeDevice, OUTPUT_CANDIDATES,
                                          numClass_, confThresh_, kMaxNumOutputBbox, kNumBoxElement, stream);
-        DEBUG_FUNCTION_RUNNING_TIME_VOID("2-5.Yolo NMS", nms, decodeDevice, nmsThresh_, kMaxNumOutputBbox,
+        DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-5.Yolo NMS", nms, decodeDevice, nmsThresh_, kMaxNumOutputBbox,
                                          kNumBoxElement, stream);
 #else
         // transpose [1 84 8400] convert to [1 8400 84]

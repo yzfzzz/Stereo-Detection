@@ -54,7 +54,3 @@ auto DEBUG_FUNCTION_RUNNING_TIME_IMPL(const std::string & name, Func && func) ->
 // 版本5：自由函数带参数版本
 #define DEBUG_FUNCTION_RUNNING_TIME_FUNC(name, func, ...) \
     DEBUG_FUNCTION_RUNNING_TIME_IMPL(name, [&]() { return func(__VA_ARGS__); })
-
-// 版本6：无返回值函数带参数版本（适配 void 返回类型）
-#define DEBUG_FUNCTION_RUNNING_TIME_VOID(name, func, ...) \
-    DEBUG_FUNCTION_RUNNING_TIME_IMPL(name, [&]() { func(__VA_ARGS__); })
