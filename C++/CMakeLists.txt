@@ -5,10 +5,16 @@ project(depth_detection)
 add_definitions(-std=c++14)
 add_definitions(-DAPI_EXPORTS)
 set(CMAKE_CXX_STANDARD 14)
-# set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
+# set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
+option(ENABLE_TIMER "Enable function timing" OFF)
+if(ENABLE_TIMER)
+    message(STATUS "Enabling function timing")
+    add_definitions(-DENABLE_TIMER)
+endif()
 
 # ============= Jetson Nano Optimization Configuration ============
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")

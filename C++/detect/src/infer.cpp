@@ -216,29 +216,36 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     }
 
     // put input on device, then letterbox、bgr to rgb、hwc to chw、normalize.
-    {
-        ScopedTimer timer("2-1.yolo preprocess");
-        preprocess(img, (float *) vBufferD[0], input_h, input_w, stream);
-    }
-    {
-        ScopedTimer timer("2-2.yolo infer enqueue");
-        // TensorRT inference - use appropriate API based on platform/TensorRT version
-#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
-        // For Jetson Nano (ARM64) and older TensorRT versions
-        void * bindings[] = { vBufferD[0], vBufferD[1] };
-        bool   status     = context->enqueueV2(bindings, stream, nullptr);
+#if defined(ENABLE_TIMER)
+
+    DEBUG_FUNCTION_RUNNING_TIME_VOID("2-1.Yolo Preprocess", preprocess, img, (float *) vBufferD[0], input_h, input_w,
+                                     stream);
 #else
-        // For newer TensorRT versions on x86_64
-        context->setTensorAddress("images", vBufferD[0]);
-        context->setTensorAddress("output0", vBufferD[1]);
-        bool status = context->enqueueV3(stream);
+    preprocess(img, (float *) vBufferD[0], input_h, input_w, stream);
+
 #endif
-        if (!status) {
-            std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
-            return {};
-        }
-        cudaStreamSynchronize(stream);
+
+    // TensorRT inference - use appropriate API based on platform/TensorRT version
+#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+    // For Jetson Nano (ARM64) and older TensorRT versions
+    void * bindings[] = { vBufferD[0], vBufferD[1] };
+    bool   status     = context->enqueueV2(bindings, stream, nullptr);
+#else
+    // For newer TensorRT versions on x86_64
+    context->setTensorAddress("images", vBufferD[0]);
+    context->setTensorAddress("output0", vBufferD[1]);
+    bool status = context->enqueueV3(stream);
+#endif
+    if (!status) {
+        std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
+        return {};
     }
+#if defined(ENABLE_TIMER)
+    DEBUG_FUNCTION_RUNNING_TIME_VOID("2-2.Yolo Infer Sync", cudaStreamSynchronize, stream);
+#else
+    cudaStreamSynchronize(stream);
+#endif
+
     if (!is_need_nms_) {
         // 走yolo26推理，输出候选框较少，且已经经过nms处理，不需要再做一次nms了
         // [1 1801]
@@ -247,8 +254,15 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
                               cudaMemcpyDeviceToHost, stream));
         cudaStreamSynchronize(stream);
     } else {
-        ScopedTimer timer("2-3.yolo nms");
         // 走yolo8推理，输出候选框较多，需要做一次nms处理
+#if defined(ENABLE_TIMER)
+        DEBUG_FUNCTION_RUNNING_TIME_VOID("2-3.Yolo Transpose", transpose, (float *) vBufferD[1], transposeDevice,
+                                         OUTPUT_CANDIDATES, numClass_ + 4, stream);
+        DEBUG_FUNCTION_RUNNING_TIME_VOID("2-4.Yolo Decode", decode, transposeDevice, decodeDevice, OUTPUT_CANDIDATES,
+                                         numClass_, confThresh_, kMaxNumOutputBbox, kNumBoxElement, stream);
+        DEBUG_FUNCTION_RUNNING_TIME_VOID("2-5.Yolo NMS", nms, decodeDevice, nmsThresh_, kMaxNumOutputBbox,
+                                         kNumBoxElement, stream);
+#else
         // transpose [1 84 8400] convert to [1 8400 84]
         transpose((float *) vBufferD[1], transposeDevice, OUTPUT_CANDIDATES, numClass_ + 4, stream);
         // convert [1 8400 84] to [1 7001]
@@ -256,6 +270,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
                kNumBoxElement, stream);
         // cuda nms
         nms(decodeDevice, nmsThresh_, kMaxNumOutputBbox, kNumBoxElement, stream);
+#endif
 
         CHECK(cudaMemcpyAsync(outputData, decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float),
                               cudaMemcpyDeviceToHost, stream));

@@ -100,42 +100,58 @@ void BaseDepthModel::Init(const std::string & engine_path, nvinfer1::ILogger & l
 }
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
-    // 1. 预处理
+// 1. 预处理
+#if defined(ENABLE_TIMER)
+
+    std::vector<float> input =
+        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3-1.DepthModel Preprocess", this, Preprocess, image);
+#else
     std::vector<float> input = Preprocess(image);
+
+#endif
 
     cudaMemcpyAsync(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice, stream);
 
-    {
-        ScopedTimer timer("3-2.DepthModel Infer");
-        // 2. 推理
+    // 2. 推理
 #if NV_TENSORRT_MAJOR < 10
-        context->enqueueV2(buffer, stream, nullptr);
+    context->enqueueV2(buffer, stream, nullptr);
 
 #else
-        context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
-        context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
+    context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
+    context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
 
-        bool status = context->enqueueV3(stream);
-        if (!status) {
-            std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
-            return {};
-        }
+    bool status = context->enqueueV3(stream);
+    if (!status) {
+        std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
+        return {};
+    }
 
 #endif
-        cudaStreamSynchronize(stream);
-    }
+#if defined(ENABLE_TIMER)
+    DEBUG_FUNCTION_RUNNING_TIME_VOID("3-2.DepthModel Infer Sync", cudaStreamSynchronize, stream);
+#else
+    cudaStreamSynchronize(stream);
+
+#endif
 
     // 3. 后处理：只拷贝数据，返回原始深度矩阵
     cudaMemcpyAsync(output_data, buffer[1], input_h * input_w * sizeof(float), cudaMemcpyDeviceToHost, stream);
     cudaStreamSynchronize(stream);
 
+#if defined(ENABLE_TIMER)
+
+    std::pair<cv::Mat, cv::Mat> postprocess_result =
+        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3-3.DepthModel Postprocess", this, Postprocess);
+#else
     std::pair<cv::Mat, cv::Mat> postprocess_result = Postprocess();
+
+#endif
+
     return postprocess_result;
 }
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::Postprocess() {
-    ScopedTimer timer("3-3.BaseDepthModel::Postprocess");
-    cv::Mat     depth_mat(input_h, input_w, CV_32FC1, output_data);
+    cv::Mat depth_mat(input_h, input_w, CV_32FC1, output_data);
     cv::normalize(depth_mat, depth_mat, 0, 255, cv::NORM_MINMAX, CV_8U);
 
     cv::Mat colormap;

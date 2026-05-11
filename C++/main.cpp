@@ -101,13 +101,16 @@ int run(char * videoPath) {
     cv::Mat out_frame;
 
     while (true) {
-        ScopedTimer timer_total("One frame average time");
-        {
-            ScopedTimer timer("1.Cap read");
-            if (!cap.read(img)) {
-                break;
-            }
+#if defined(ENABLE_TIMER)
+        if (!DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("1.Cap Read", cap, read, img)) {
+            break;
         }
+#else
+        if (!cap.read(img)) {
+            break;
+        }
+#endif
+
         num_frames++;
         if (num_frames % 100 == 0) {
             cout << "Processing frame " << num_frames << " ("
@@ -121,24 +124,27 @@ int run(char * videoPath) {
 
         // 端侧部署的情况下可以用串行保证端到端低延迟
         // depthinference
-        {
-            ScopedTimer timer("3.Depth inference");
-            bool        do_depth = (!has_cached_depth) || ((num_frames - 1) % depth_interval == 0);
-            if (do_depth) {
-                std::pair<cv::Mat, cv::Mat> depth_infer_result = depth_model->Predict(img);
-                result_depth                                   = depth_infer_result.first;
-                depth_vis                                      = depth_infer_result.second;
-                has_cached_depth                               = true;
-            }
+
+        bool do_depth = (!has_cached_depth) || ((num_frames - 1) % depth_interval == 0);
+        if (do_depth) {
+#if defined(ENABLE_TIMER)
+            std::pair<cv::Mat, cv::Mat> depth_infer_result =
+                DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("3.Depth Infer", *depth_model, Predict, img);
+#else
+            std::pair<cv::Mat, cv::Mat> depth_infer_result = depth_model->Predict(img);
+#endif
+            result_depth     = depth_infer_result.first;
+            depth_vis        = depth_infer_result.second;
+            has_cached_depth = true;
         }
 
         // yolo inference
-        std::vector<Detection> res;
-        {
-            ScopedTimer timer("2.YOLO inference");
-            res = detector.inference(img);
-        }
+#if defined(ENABLE_TIMER)
+        std::vector<Detection> res = DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("2.YOLO Infer", detector, inference, img);
+#else
+        std::vector<Detection> res = detector.inference(img);
 
+#endif
         // yolo output format to bytetrack input format, and filter bbox by class id
         std::vector<Object> objects;
         for (size_t j = 0; j < res.size(); j++) {
@@ -154,12 +160,13 @@ int run(char * videoPath) {
         }
 
         // track
-        std::vector<STrack> output_stracks;
-        {
-            ScopedTimer timer("4.ByteTrack");
-            output_stracks = tracker.update(objects);
-        }
+#if defined(ENABLE_TIMER)
+        std::vector<STrack> output_stracks =
+            DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("4.ByteTrack", tracker, update, objects);
+#else
+        std::vector<STrack> output_stracks = tracker.update(objects);
 
+#endif
         // 更新显示管理器数据（供鼠标点击查询使用）
         display_manager.updateData(output_stracks, result_depth);
 
@@ -167,53 +174,50 @@ int run(char * videoPath) {
         total_us += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
         // Only for visualization, not required for depth estimation or tracking logic
-        {
-            ScopedTimer timer("5.Draw");
-            for (int i = 0; i < output_stracks.size(); i++) {
-                const std::vector<float> & tlwh = output_stracks[i].tlwh;
-                if (tlwh[2] * tlwh[3] <= 20) {
-                    continue;
-                }
-
-                int class_id = output_stracks[i].class_id;
-
-                int track_id = output_stracks[i].track_id;
-
-                // 1. 提取目标中心点在深度图上的相对深度
-                int cx = static_cast<int>(tlwh[0] + tlwh[2] / 2);
-                int cy = static_cast<int>(tlwh[1] + tlwh[3] / 2);
-
-                // 防止越界
-                cx = std::max(0, std::min(cx, result_depth.cols - 1));
-                cy = std::max(0, std::min(cy, result_depth.rows - 1));
-
-                float current_depth = 0.0f;
-                // 根据深度图的数据类型获取数值，通常推理输出是 CV_32FC1 或归一化后的 CV_8UC1
-                if (result_depth.type() == CV_32FC1) {
-                    current_depth = result_depth.at<float>(cy, cx);
-                } else if (result_depth.type() == CV_8UC1) {
-                    current_depth = static_cast<float>(result_depth.at<uchar>(cy, cx));
-                }
-
-                cv::Scalar  s = tracker.get_color(output_stracks[i].track_id);
-                std::string label =
-                    cv::format("%s #%d [Depth: %.2f]", vClassNames[class_id].c_str(), track_id, current_depth);
-
-                int      baseLine   = 0;
-                cv::Size label_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &baseLine);
-                cv::Rect rect_bg(cv::Point((int) tlwh[0], (int) tlwh[1] - label_size.height - 8),
-                                 cv::Size(label_size.width + 8, label_size.height + 8));
-                cv::rectangle(img, rect_bg, s, cv::FILLED);
-                cv::putText(img, label, cv::Point((int) tlwh[0] + 4, (int) tlwh[1] - 4), cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                            cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
-
-                cv::rectangle(img, cv::Rect((int) tlwh[0], (int) tlwh[1], (int) tlwh[2], (int) tlwh[3]), s, 2);
+        for (int i = 0; i < output_stracks.size(); i++) {
+            const std::vector<float> & tlwh = output_stracks[i].tlwh;
+            if (tlwh[2] * tlwh[3] <= 20) {
+                continue;
             }
 
-            int show_fps = (total_us > 0) ? (num_frames * 1000000LL / total_us) : 0;
-            cv::putText(img, cv::format("frame: %d fps: %d num: %ld", num_frames, show_fps, output_stracks.size()),
-                        cv::Point(0, 30), 0, 0.6, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+            int class_id = output_stracks[i].class_id;
+
+            int track_id = output_stracks[i].track_id;
+
+            // 1. 提取目标中心点在深度图上的相对深度
+            int cx = static_cast<int>(tlwh[0] + tlwh[2] / 2);
+            int cy = static_cast<int>(tlwh[1] + tlwh[3] / 2);
+
+            // 防止越界
+            cx = std::max(0, std::min(cx, result_depth.cols - 1));
+            cy = std::max(0, std::min(cy, result_depth.rows - 1));
+
+            float current_depth = 0.0f;
+            // 根据深度图的数据类型获取数值，通常推理输出是 CV_32FC1 或归一化后的 CV_8UC1
+            if (result_depth.type() == CV_32FC1) {
+                current_depth = result_depth.at<float>(cy, cx);
+            } else if (result_depth.type() == CV_8UC1) {
+                current_depth = static_cast<float>(result_depth.at<uchar>(cy, cx));
+            }
+
+            cv::Scalar  s = tracker.get_color(output_stracks[i].track_id);
+            std::string label =
+                cv::format("%s #%d [Depth: %.2f]", vClassNames[class_id].c_str(), track_id, current_depth);
+
+            int      baseLine   = 0;
+            cv::Size label_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &baseLine);
+            cv::Rect rect_bg(cv::Point((int) tlwh[0], (int) tlwh[1] - label_size.height - 8),
+                             cv::Size(label_size.width + 8, label_size.height + 8));
+            cv::rectangle(img, rect_bg, s, cv::FILLED);
+            cv::putText(img, label, cv::Point((int) tlwh[0] + 4, (int) tlwh[1] - 4), cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                        cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
+
+            cv::rectangle(img, cv::Rect((int) tlwh[0], (int) tlwh[1], (int) tlwh[2], (int) tlwh[3]), s, 2);
         }
+
+        int show_fps = (total_us > 0) ? (num_frames * 1000000LL / total_us) : 0;
+        cv::putText(img, cv::format("frame: %d fps: %d num: %ld", num_frames, show_fps, output_stracks.size()),
+                    cv::Point(0, 30), 0, 0.6, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
 
         out_frame.create(img.rows + depth_vis.rows, img.cols, img.type());
         img.copyTo(out_frame(cv::Rect(0, 0, img.cols, img.rows)));
