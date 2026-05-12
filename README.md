@@ -1,4 +1,4 @@
-[![GitHub](./doc/product.png)]
+![GitHub](./doc/product.png)
 
 # Stereo-Detection C++ 部署框架
 
