@@ -5,8 +5,8 @@ project(depth_detection)
 add_definitions(-std=c++14)
 add_definitions(-DAPI_EXPORTS)
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_BUILD_TYPE Debug)
-# set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
@@ -79,14 +79,14 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 # =========== bytetrack lib ===========
 include_directories(${PROJECT_SOURCE_DIR}/bytetrack/include)
-file(GLOB_RECURSE SRCS01 ${PROJECT_SOURCE_DIR}/bytetrack/src/*.cpp)
-add_library(bytetrack SHARED ${SRCS01})
+file(GLOB_RECURSE BYTETRACK_SRCS ${PROJECT_SOURCE_DIR}/bytetrack/src/*.cpp)
+add_library(bytetrack SHARED ${BYTETRACK_SRCS})
 target_link_libraries(bytetrack cudart nvinfer ${OpenCV_LIBS})
 
 # ============= yolo lib =============
 include_directories(${PROJECT_SOURCE_DIR}/detect/include)
-file(GLOB_RECURSE SRCS02 ${PROJECT_SOURCE_DIR}/detect/src/*.cpp ${PROJECT_SOURCE_DIR}/detect/src/*.cu)
-cuda_add_library(yolo_infer SHARED ${SRCS02})
+file(GLOB_RECURSE YOLO_SRCS ${PROJECT_SOURCE_DIR}/detect/src/*.cpp ${PROJECT_SOURCE_DIR}/detect/src/*.cu)
+cuda_add_library(yolo_infer SHARED ${YOLO_SRCS})
 
 # Jetson Nano specific optimizations
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
@@ -98,13 +98,15 @@ target_link_libraries(yolo_infer nvinfer cudart nvonnxparser ${OpenCV_LIBS})
 
 # ============= depth lib =============
 include_directories(${PROJECT_SOURCE_DIR}/depth/include)
-file(GLOB_RECURSE SRCS03 ${PROJECT_SOURCE_DIR}/depth/src/*.cpp)
-add_library(depth SHARED ${SRCS03})
+file(GLOB_RECURSE DEPTH_SRCS ${PROJECT_SOURCE_DIR}/depth/src/*.cpp)
+add_library(depth SHARED ${DEPTH_SRCS})
 target_link_libraries(depth cudart nvinfer ${OpenCV_LIBS})
 
 
 # ======== main execute file ========
 find_package(yaml-cpp REQUIRED)
-include_directories(${PROJECT_SOURCE_DIR}/tools/include)
-add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp)
+include_directories(${PROJECT_SOURCE_DIR}/tools/include ${PROJECT_SOURCE_DIR}/core/include)
+file(GLOB_RECURSE TOOL_SRCS ${PROJECT_SOURCE_DIR}/tools/src/*.cpp)
+file(GLOB_RECURSE CORE_SRCS ${PROJECT_SOURCE_DIR}/core/src/*.cpp)
+add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp ${TOOL_SRCS} ${CORE_SRCS})
 target_link_libraries(main bytetrack yolo_infer depth yaml-cpp)

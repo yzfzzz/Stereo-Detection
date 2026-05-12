@@ -1,6 +1,5 @@
 #pragma once
 #include <chrono>
-#include <iostream>
 #include <map>
 #include <string>
 #include <utility>
@@ -9,21 +8,9 @@ class ScopedTimer {
   public:
     explicit ScopedTimer(std::string name) : name_(std::move(name)), start_(std::chrono::steady_clock::now()) {}
 
-    ~ScopedTimer() {
-        auto   end          = std::chrono::steady_clock::now();
-        auto   us           = std::chrono::duration_cast<std::chrono::microseconds>(end - start_).count();
-        auto & timers_table = GetScopedTimers();
-        if (timers_table.find(name_) != timers_table.end()) {
-            timers_table[name_] += us;
-        } else {
-            timers_table[name_] = us;
-        }
-    }
+    ~ScopedTimer();
 
-    static std::map<std::string, double> & GetScopedTimers() {
-        static std::map<std::string, double> scoped_timers_table;
-        return scoped_timers_table;
-    }
+    static std::map<std::string, double> & GetScopedTimers();
 
   private:
     std::string                           name_;

@@ -1,4 +1,5 @@
 #include "BYTETracker.h"
+#include "config_manager.h"
 #include "depth_anything.h"
 #include "display_manager.h"
 #include "infer.h"
@@ -7,7 +8,6 @@
 
 #include <dlfcn.h>
 #include <sys/stat.h>
-#include <yaml-cpp/yaml.h>
 
 #include <iostream>
 #include <memory>
@@ -44,49 +44,39 @@ int run(char * videoPath) {
     long nFrame = static_cast<long>(cap.get(CAP_PROP_FRAME_COUNT));
     cout << "Total frames: " << nFrame << endl;
 
-    YAML::Node  config                   = YAML::LoadFile("config.yaml");
-    std::string yolo_trt_file            = config["yolo_engine"].as<std::string>();
-    std::string depth_trt_file           = config["depth_engine"].as<std::string>();
-    int         depth_interval           = config["depth_interval"].as<int>();
-    std::string mode                     = config["mode"].as<std::string>("release");
-    std::string save_mode                = config["save_mode"].as<std::string>("none");
-    std::string out_dir                  = config["out_dir"].as<std::string>("out_dir");
-    bool        enable_human_interaction = (mode == "debug");
-
-    if (save_mode == "images" || save_mode == "both") {
-        if (!dirExists(out_dir)) {
-            system(("mkdir -p " + out_dir).c_str());
+    // ConfigManager 读取配置文件
+    ConfigManager config_manager("config.yaml");
+    if (config_manager.GetSaveMode() == "images" || config_manager.GetSaveMode() == "both") {
+        if (!dirExists(config_manager.GetOutDir())) {
+            system(("mkdir -p " + config_manager.GetOutDir()).c_str());
         }
     }
-
     cv::VideoWriter writer;
-    if (save_mode == "video" || save_mode == "both") {
+    if (config_manager.GetSaveMode() == "video" || config_manager.GetSaveMode() == "both") {
         writer.open("result.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(img_w, img_h * 2));
     }
-
     // YOLOv8 predictor
-    YoloDetector detector(yolo_trt_file, 0, 0.45, 0.01);
-
+    YoloDetector                    detector(config_manager.GetYoloEnginePath(), 0, 0.45, 0.01);
     std::unique_ptr<BaseDepthModel> depth_model;
     Logger                          logger;
 
-    if (depth_trt_file.find("depth_anything") != std::string::npos) {
+    if (config_manager.GetDepthEnginePath().find("depth_anything") != std::string::npos) {
         depth_model = std::make_unique<DepthAnything>();
         cout << "Using Depth-Anything depth engine." << endl;
-    } else if (depth_trt_file.find("lite_mono") != std::string::npos) {
+    } else if (config_manager.GetDepthEnginePath().find("lite_mono") != std::string::npos) {
         depth_model = std::make_unique<LiteMono>();
         cout << "Using Lite-Mono depth engine." << endl;
     } else {
-        std::cerr << "Unknown depth engine type: " << depth_trt_file << std::endl;
+        std::cerr << "Unknown depth engine type: " << config_manager.GetDepthEnginePath() << std::endl;
         return -1;
     }
-    depth_model->Init(depth_trt_file, logger);
+    depth_model->Init(config_manager.GetDepthEnginePath(), logger);
 
     // ByteTrack tracker
     BYTETracker tracker(fps, 30);
 
     // 创建显示管理器（负责窗口管理、显示、鼠标点击等）
-    DisplayManager display_manager(enable_human_interaction);
+    DisplayManager display_manager(config_manager.IsDisplayEnabled());
 
     cv::Mat   img;
     int       num_frames = 0;
@@ -124,8 +114,7 @@ int run(char * videoPath) {
 
         // 端侧部署的情况下可以用串行保证端到端低延迟
         // depthinference
-
-        bool do_depth = (!has_cached_depth) || ((num_frames - 1) % depth_interval == 0);
+        bool do_depth = (!has_cached_depth) || ((num_frames - 1) % config_manager.GetDepthInterval() == 0);
         if (do_depth) {
 #if defined(ENABLE_TIMER)
             std::pair<cv::Mat, cv::Mat> depth_infer_result =
@@ -230,12 +219,12 @@ int run(char * videoPath) {
         }
 
         // 保存图像或视频
-        if (save_mode == "images" || save_mode == "both") {
-            std::string save_path = out_dir + "/frame_" + std::to_string(num_frames) + ".jpg";
+        if (config_manager.GetSaveMode() == "images" || config_manager.GetSaveMode() == "both") {
+            std::string save_path = config_manager.GetOutDir() + "/frame_" + std::to_string(num_frames) + ".jpg";
             cv::imwrite(save_path, out_frame);
         }
 
-        if (save_mode == "video" || save_mode == "both") {
+        if (config_manager.GetSaveMode() == "video" || config_manager.GetSaveMode() == "both") {
             writer.write(out_frame);
         }
 
@@ -244,8 +233,8 @@ int run(char * videoPath) {
             display_manager.show(out_frame);
             char c      = display_manager.waitKey(1);
             int  result = display_manager.handleKey(c);
-            if (result == -404) {
-                break;  // 用户退出
+            if (result == Key_Input::ESC) {  // 用户按下 ESC 键退出
+                break;                       // 用户退出
             }
         }
     }
