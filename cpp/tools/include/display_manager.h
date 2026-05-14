@@ -1,7 +1,10 @@
 #pragma once
 
+#include "motion_state_engine.h"
 #include "STrack.h"
 
+#include <map>
+#include <opencv2/core/types.hpp>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
@@ -46,8 +49,12 @@ class DisplayManager {
     // 处理鼠标点击
     void handleMouseClick(int x, int y);
 
+    cv::Size display_size_;
+
   public:
-    DisplayManager(bool enabled, const std::string & window_name = "out_frame");
+    DisplayManager(bool                enabled,
+                   const std::string & window_name  = "out_frame",
+                   cv::Size            display_size = cv::Size(1280, 720 * 2));
     ~DisplayManager();
 
     // 更新跟踪数据供鼠标回调使用
@@ -65,4 +72,31 @@ class DisplayManager {
 
     // 友元函数：鼠标回调
     friend void onMouse(int event, int x, int y, int flags, void * userdata);
+};
+
+class DepthPlotter {
+  public:
+    // 构造函数，传入输出目录
+    DepthPlotter(const std::string & out_dir = "out_dir/depth_trend");
+    ~DepthPlotter();
+
+    // 更新某个给定 track_id 在指定时间的深度值
+    // frame_id 是横坐标之一可选（为了更规整的显示），这里我们使用帧索引作为 X 轴可能更好画
+    // 但是您提供了 frame_timestamp，我们也可以同时存。不过通常为了等距作图画折线，存 frame_id 就够了。
+    void update(int track_id, int frame_id, float current_depth);
+
+    // 把画好的趋势图保存到文件中
+    void savePlots();
+
+  private:
+    std::string out_dir_;
+
+    // 记录 track_id 的深度历史：对应关系 -> frame_id, depth
+    std::map<int, std::vector<std::pair<int, float>>> track_depth_history_;
+
+    // 在一个子区域 ROI 中画出一条折线图
+    void drawSinglePlot(cv::Mat &                                  canvas,
+                        const cv::Rect &                           roi,
+                        int                                        track_id,
+                        const std::vector<std::pair<int, float>> & history) const;
 };

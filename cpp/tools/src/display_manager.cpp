@@ -1,5 +1,7 @@
 #include "display_manager.h"
 
+#include <experimental/filesystem>
+
 // 全局鼠标回调函数
 void onMouse(int event, int x, int y, int flags, void * userdata) {
     DisplayManager * dm = static_cast<DisplayManager *>(userdata);
@@ -12,12 +14,13 @@ void onMouse(int event, int x, int y, int flags, void * userdata) {
     }
 }
 
-DisplayManager::DisplayManager(bool enabled, const std::string & window_name) :
+DisplayManager::DisplayManager(bool enabled, const std::string & window_name, cv::Size display_size) :
     enabled_(enabled),
-    window_name_(window_name) {
+    window_name_(window_name),
+    display_size_(display_size) {
     if (enabled_) {
         cv::namedWindow(window_name_, cv::WINDOW_NORMAL);
-        cv::resizeWindow(window_name_, 1280, 720);
+        cv::resizeWindow(window_name_, display_size_.width, display_size_.height);
         cv::setMouseCallback(window_name_, onMouse, this);
         std::cout << "DisplayManager initialized" << std::endl;
     }
@@ -183,4 +186,127 @@ int DisplayManager::waitKey(int delay) {
         return Key_Input::ESC;
     }
     return cv::waitKey(delay);
+}
+
+DepthPlotter::DepthPlotter(const std::string & out_dir) : out_dir_(out_dir) {
+    if (!std::experimental::filesystem::exists(out_dir_)) {
+        std::experimental::filesystem::create_directories(out_dir_);
+    }
+}
+
+DepthPlotter::~DepthPlotter() {}
+
+void DepthPlotter::update(int track_id, int frame_id, float current_depth) {
+    if (current_depth > 0) {
+        track_depth_history_[track_id].push_back({ frame_id, current_depth });
+    }
+}
+
+void DepthPlotter::drawSinglePlot(cv::Mat &                                  canvas,
+                                  const cv::Rect &                           roi,
+                                  int                                        track_id,
+                                  const std::vector<std::pair<int, float>> & history) const {
+    if (history.empty()) {
+        return;
+    }
+
+    // 背景和边框
+    cv::rectangle(canvas, roi, cv::Scalar(240, 240, 240), -1);
+    cv::rectangle(canvas, roi, cv::Scalar(0, 0, 0), 2);
+
+    int min_x = history.front().first;
+    int max_x = history.back().first;
+    if (min_x == max_x) {
+        max_x = min_x + 1;  // 避免除以 0
+    }
+
+    float min_y = history[0].second, max_y = history[0].second;
+    for (const auto & pt : history) {
+        min_y = std::min(min_y, pt.second);
+        max_y = std::max(max_y, pt.second);
+    }
+
+    // Y 轴适当留白
+    float pad_y = std::max(0.5f, (max_y - min_y) * 0.15f);
+    min_y       = std::max(0.0f, min_y - pad_y);
+    max_y       = max_y + pad_y;
+
+    int pad_left = 60, pad_bottom = 30;
+    int plot_w = roi.width - pad_left - 15;
+    int plot_h = roi.height - pad_bottom - 45;
+
+    int plot_x0 = roi.x + pad_left;
+    int plot_y0 = roi.y + roi.height - pad_bottom;
+
+    // 绘制标签
+    cv::putText(canvas, "Track ID: " + std::to_string(track_id), cv::Point(roi.x + 10, roi.y + 25),
+                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+
+    cv::putText(canvas, cv::format("%.2f", max_y), cv::Point(roi.x + 5, roi.y + 50), cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                cv::Scalar(80, 80, 80));
+    cv::putText(canvas, cv::format("%.2f", min_y), cv::Point(roi.x + 5, plot_y0 - 5), cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                cv::Scalar(80, 80, 80));
+
+    // 绘制折线
+    for (size_t i = 1; i < history.size(); ++i) {
+        int x1 = plot_x0 + (history[i - 1].first - min_x) * plot_w / (max_x - min_x);
+        int y1 = plot_y0 - (history[i - 1].second - min_y) * plot_h / (max_y - min_y);
+
+        int x2 = plot_x0 + (history[i].first - min_x) * plot_w / (max_x - min_x);
+        int y2 = plot_y0 - (history[i].second - min_y) * plot_h / (max_y - min_y);
+
+        cv::line(canvas, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 0, 0), 2, cv::LINE_AA);
+        cv::circle(canvas, cv::Point(x2, y2), 3, cv::Scalar(0, 0, 255), -1, cv::LINE_AA);
+    }
+}
+
+void DepthPlotter::savePlots() {
+    if (track_depth_history_.empty()) {
+        return;
+    }
+
+    const int canvas_w         = 1920;
+    const int canvas_h         = 1080;
+    const int grid_cols        = 4;
+    const int grid_rows        = 4;
+    const int plots_per_canvas = grid_cols * grid_rows;  // 16
+
+    int cell_w = canvas_w / grid_cols;
+    int cell_h = canvas_h / grid_rows;
+
+    std::vector<int> valid_tracks;
+    for (const auto & pair : track_depth_history_) {
+        if (pair.second.size() >= 3) {  // 只画那些存在超过 3 帧数据的
+            valid_tracks.push_back(pair.first);
+        }
+    }
+
+    int total_tracks = valid_tracks.size();
+    if (total_tracks == 0) {
+        return;
+    }
+
+    int canvas_count = (total_tracks + plots_per_canvas - 1) / plots_per_canvas;
+
+    for (int c = 0; c < canvas_count; ++c) {
+        cv::Mat canvas(canvas_h, canvas_w, CV_8UC3, cv::Scalar(255, 255, 255));
+
+        for (int i = 0; i < plots_per_canvas; ++i) {
+            int track_idx = c * plots_per_canvas + i;
+            if (track_idx >= total_tracks) {
+                break;
+            }
+
+            int      track_id = valid_tracks[track_idx];
+            int      row      = i / grid_cols;
+            int      col      = i % grid_cols;
+            cv::Rect roi(col * cell_w, row * cell_h, cell_w, cell_h);
+
+            drawSinglePlot(canvas, roi, track_id, track_depth_history_[track_id]);
+        }
+
+        std::string filename = out_dir_ + "/depth_trend_canvas_" + std::to_string(c + 1) + ".jpg";
+        cv::imwrite(filename, canvas);
+        std::cout << "[DepthPlotter] Saved: " << filename << std::endl;
+    }
 }
