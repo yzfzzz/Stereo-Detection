@@ -1,12 +1,8 @@
 #pragma once
-#include "config.h"
 #include "STrack.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <iostream>
-#include <numeric>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/operations.hpp>
 #include <opencv2/core/types.hpp>
@@ -24,51 +20,46 @@ enum MotionState {
     CONSTANT  = 7
 };
 
+struct MotionStateInfoRecord {
+    MotionStateInfoRecord(MotionState state_vec, MotionState state_acc, float velocity) :
+        state_vec(state_vec),
+        state_acc(state_acc),
+        velocity(velocity) {}
+
+    MotionState state_vec;
+    MotionState state_acc;
+    float       velocity;
+};
+
 const std::map<std::pair<MotionState, MotionState>, std::string> MOTION_STR_MAP = {
-    { { STABLE, CONSTANT },    "Stable"               },
-    { { APPROACH, ACCELE },    "Approach (Accele)"    },
-    { { APPROACH, DECELE },    "Approach (Decele)"    },
-    { { APPROACH, CONSTANT },  "Approach (Constant)"  },
-    { { MOVE_AWAY, ACCELE },   "Move Away (Accele)"   },
-    { { MOVE_AWAY, DECELE },   "Move Away (Decele)"   },
-    { { MOVE_AWAY, CONSTANT }, "Move Away (Constant)" },
+    { { MotionState::STABLE, MotionState::CONSTANT },    "Stable"               },
+    { { MotionState::APPROACH, MotionState::ACCELE },    "Approach (Accele)"    },
+    { { MotionState::APPROACH, MotionState::DECELE },    "Approach (Decele)"    },
+    { { MotionState::APPROACH, MotionState::CONSTANT },  "Approach (Constant)"  },
+    { { MotionState::MOVE_AWAY, MotionState::ACCELE },   "Move Away (Accele)"   },
+    { { MotionState::MOVE_AWAY, MotionState::DECELE },   "Move Away (Decele)"   },
+    { { MotionState::MOVE_AWAY, MotionState::CONSTANT }, "Move Away (Constant)" },
 };
 
 class MotionStateEngine {
   public:
-    MotionStateEngine(int    sma_window_size      = 5,
-                      float  velocity_threshold   = 5.0f,
-                      float  acceleration_threshold = 1.5f,
-                      float  jump_threshold       = 0.3f,
-                      int    consistency_frames   = 3);
+    MotionStateEngine(float velocity_threshold = 5.0f, float acceleration_threshold = 1.5f);
 
-    std::pair<MotionState, MotionState> computeMotionState(int track_id, float raw_depth, double timestamp);
+    MotionStateInfoRecord computeMotionState(int track_id, float raw_depth, double timestamp);
 
     float getObjectDepth(cv::Mat depth, const STrack & track, cv::Size image_size);
 
-    float computeMeanDepth(cv::Mat depth, const std::vector<float> & tlwh, int num_samples = 25) const;
+    float computeMeanDepth(cv::Mat depth, const std::vector<float> & tlwh, int num_samples = 64) const;
 
   private:
-    struct ObjectState {
-        float  smoothed_depth;
-        double timestamp;
-        float  velocity;
+    struct KalmanState {
+        cv::KalmanFilter kf;
+        double           last_timestamp;
+        bool             is_initialized;
     };
 
-    bool isOutlier(int track_id, float raw_depth) const;
+    std::unordered_map<int, KalmanState> kf_states_;
 
-    float computeMedian(const std::deque<float> & queue) const;
-
-    bool checkConsistency(int track_id, MotionState direction) const;
-
-    std::unordered_map<int, std::list<ObjectState>>   history_states_;
-    std::unordered_map<int, std::deque<float>>         depth_history_queues_;
-    std::unordered_map<int, std::deque<MotionState>>   direction_history_;
-    std::unordered_map<int, int>                        outlier_count_;
-
-    int   sma_window_size_;
     float velocity_threshold_;
     float acceleration_threshold_;
-    float jump_threshold_;
-    int   consistency_frames_;
 };

@@ -1,10 +1,12 @@
 #include "BYTETracker.h"
 #include "config_manager.h"
 #include "depth_anything.h"
-#include "display_manager.h"
 #include "infer.h"
+#include "io_manager.h"
 #include "lite_mono.h"
+#include "motion_state_engine.h"
 #include "scope_timer.h"
+#include "visual_manager.h"
 
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -12,83 +14,71 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 // 需要跟踪的类别，可以根据自己需求调整，筛选自己想要跟踪的对象的种类（以下对应COCO数据集类别索引）
-std::vector<int> trackClasses{ 0, 1, 2, 3, 5, 7 };  // person, bicycle, car, motorcycle, bus, truck
-
-bool isTrackingClass(int class_id) {
-    for (auto & c : trackClasses) {
-        if (class_id == c) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool dirExists(const std::string & path) {
-    struct stat info;
-    return stat(path.c_str(), &info) == 0 && (info.st_mode & S_IFDIR);
-}
+std::vector<int> gTrackClasses{ 1, 2, 3, 5, 7 };  // person, bicycle, car, motorcycle, bus, truck
 
 int run(char * videoPath) {
     // read video
-    std::string      inputVideoPath = std::string(videoPath);
-    cv::VideoCapture cap(inputVideoPath);
+    std::string      input_video_path = std::string(videoPath);
+    cv::VideoCapture cap(input_video_path);
     if (!cap.isOpened()) {
         return 0;
     }
+    int  img_w   = cap.get(CAP_PROP_FRAME_WIDTH);
+    int  img_h   = cap.get(CAP_PROP_FRAME_HEIGHT);
+    int  fps     = cap.get(CAP_PROP_FPS);
+    long n_frame = static_cast<long>(cap.get(CAP_PROP_FRAME_COUNT));
+    cout << "Total frames: " << n_frame << endl;
 
-    int  img_w  = cap.get(CAP_PROP_FRAME_WIDTH);
-    int  img_h  = cap.get(CAP_PROP_FRAME_HEIGHT);
-    int  fps    = cap.get(CAP_PROP_FPS);
-    long nFrame = static_cast<long>(cap.get(CAP_PROP_FRAME_COUNT));
-    cout << "Total frames: " << nFrame << endl;
+    // =========ConfigManager 读取配置文件=========
+    ConfigManager  config_manager("config.yaml");
+    // 文件读写，落盘保存
+    IOManager      io_manager(config_manager, fps, img_w, img_h * 2);
+    // 绘制管理器（负责绘制结果）
+    DrawingManager drawing_manager(vClassNames);
+    // 显示管理器（负责窗口管理、显示、鼠标点击等）
+    DisplayManager display_manager(config_manager.isDisplayEnabled(), "Detection Result", cv::Size(img_w, img_h * 2));
+    // 运动状态引擎（负责计算运动状态）
+    MotionStateEngine motion_state_engine(config_manager.getMotionVelocityThreshold(),
+                                          config_manager.getMotionAccelerationThreshold());
 
-    // ConfigManager 读取配置文件
-    ConfigManager config_manager("config.yaml");
-    if (config_manager.GetSaveMode() == "images" || config_manager.GetSaveMode() == "both") {
-        if (!dirExists(config_manager.GetOutDir())) {
-            system(("mkdir -p " + config_manager.GetOutDir()).c_str());
-        }
-    }
-    cv::VideoWriter writer;
-    if (config_manager.GetSaveMode() == "video" || config_manager.GetSaveMode() == "both") {
-        writer.open("result.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(img_w, img_h * 2));
-    }
-    // YOLOv8 predictor
-    YoloDetector                    detector(config_manager.GetYoloEnginePath(), 0, 0.45, 0.01);
-    std::unique_ptr<BaseDepthModel> depth_model;
+    // =========YOLOv8 predictor=========
     Logger                          logger;
-
-    if (config_manager.GetDepthEnginePath().find("depth_anything") != std::string::npos) {
+    YoloDetector                    detector(config_manager.getYoloEnginePath(), 0, 0.35, 0.1);
+    // =========Depth predictor=========
+    std::unique_ptr<BaseDepthModel> depth_model;
+    if (config_manager.getDepthEnginePath().find("depth_anything") != std::string::npos) {
         depth_model = std::make_unique<DepthAnything>();
         cout << "Using Depth-Anything depth engine." << endl;
-    } else if (config_manager.GetDepthEnginePath().find("lite_mono") != std::string::npos) {
+    } else if (config_manager.getDepthEnginePath().find("lite_mono") != std::string::npos) {
         depth_model = std::make_unique<LiteMono>();
         cout << "Using Lite-Mono depth engine." << endl;
     } else {
-        std::cerr << "Unknown depth engine type: " << config_manager.GetDepthEnginePath() << std::endl;
+        std::cerr << "Unknown depth engine type: " << config_manager.getDepthEnginePath() << std::endl;
         return -1;
     }
-    depth_model->Init(config_manager.GetDepthEnginePath(), logger);
+    depth_model->Init(config_manager.getDepthEnginePath(), logger);
 
     // ByteTrack tracker
     BYTETracker tracker(fps, 30);
 
-    // 创建显示管理器（负责窗口管理、显示、鼠标点击等）
-    DisplayManager display_manager(config_manager.IsDisplayEnabled());
+    int       num_frames       = 0;
+    long long total_us         = 0;
+    bool      has_cached_depth = false;
 
-    cv::Mat   img;
-    int       num_frames = 0;
-    long long total_us   = 0;
+    cv::Mat img, cached_depth, result_depth, depth_vis, out_frame;
 
-    const double depth_alpha = 0.7;  // 新深度权重，0.6~0.8 常用
-    cv::Mat      cached_depth;
-    bool         has_cached_depth = false;
-    cv::Mat      result_depth;
-    cv::Mat      depth_vis;
-
-    cv::Mat out_frame;
+    auto is_tracking_class = [](int class_id) {
+        for (auto & c : gTrackClasses) {
+            if (class_id == c) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     while (true) {
 #if defined(ENABLE_TIMER)
@@ -114,7 +104,7 @@ int run(char * videoPath) {
 
         // 端侧部署的情况下可以用串行保证端到端低延迟
         // depthinference
-        bool do_depth = (!has_cached_depth) || ((num_frames - 1) % config_manager.GetDepthInterval() == 0);
+        bool do_depth = (!has_cached_depth) || ((num_frames - 1) % config_manager.getDepthInterval() == 0);
         if (do_depth) {
 #if defined(ENABLE_TIMER)
             std::pair<cv::Mat, cv::Mat> depth_infer_result =
@@ -141,7 +131,7 @@ int run(char * videoPath) {
             float   conf    = res[j].conf;
             int     classId = res[j].classId;
 
-            if (isTrackingClass(classId)) {
+            if (is_tracking_class(classId)) {
                 cv::Rect_<float> rect(bbox[0], bbox[1], (bbox[2] - bbox[0]), (bbox[3] - bbox[1]));
                 Object           obj{ rect, classId, conf };
                 objects.push_back(obj);
@@ -164,69 +154,35 @@ int run(char * videoPath) {
 
         // Only for visualization, not required for depth estimation or tracking logic
         for (int i = 0; i < output_stracks.size(); i++) {
-            const std::vector<float> & tlwh = output_stracks[i].tlwh;
-            if (tlwh[2] * tlwh[3] <= 20) {
+            if (output_stracks[i].tlwh[2] * output_stracks[i].tlwh[3] <= 20) {
                 continue;
             }
 
             int class_id = output_stracks[i].class_id;
-
             int track_id = output_stracks[i].track_id;
 
-            // 1. 提取目标中心点在深度图上的相对深度
-            int cx = static_cast<int>(tlwh[0] + tlwh[2] / 2);
-            int cy = static_cast<int>(tlwh[1] + tlwh[3] / 2);
+            float  current_depth   = motion_state_engine.getObjectDepth(result_depth, output_stracks[i], img.size());
+            // 获取时间戳 (秒)
+            double frame_timestamp = std::chrono::duration<double>(end.time_since_epoch()).count();
 
-            // 防止越界
-            cx = std::max(0, std::min(cx, result_depth.cols - 1));
-            cy = std::max(0, std::min(cy, result_depth.rows - 1));
+            // 计算运动状态
+            MotionStateInfoRecord motion_state_info_record =
+                motion_state_engine.computeMotionState(track_id, current_depth, frame_timestamp);
 
-            float current_depth = 0.0f;
-            // 根据深度图的数据类型获取数值，通常推理输出是 CV_32FC1 或归一化后的 CV_8UC1
-            if (result_depth.type() == CV_32FC1) {
-                current_depth = result_depth.at<float>(cy, cx);
-            } else if (result_depth.type() == CV_8UC1) {
-                current_depth = static_cast<float>(result_depth.at<uchar>(cy, cx));
-            }
-
-            cv::Scalar  s = tracker.get_color(output_stracks[i].track_id);
-            std::string label =
-                cv::format("%s #%d [Depth: %.2f]", vClassNames[class_id].c_str(), track_id, current_depth);
-
-            int      baseLine   = 0;
-            cv::Size label_size = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &baseLine);
-            cv::Rect rect_bg(cv::Point((int) tlwh[0], (int) tlwh[1] - label_size.height - 8),
-                             cv::Size(label_size.width + 8, label_size.height + 8));
-            cv::rectangle(img, rect_bg, s, cv::FILLED);
-            cv::putText(img, label, cv::Point((int) tlwh[0] + 4, (int) tlwh[1] - 4), cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                        cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
-
-            cv::rectangle(img, cv::Rect((int) tlwh[0], (int) tlwh[1], (int) tlwh[2], (int) tlwh[3]), s, 2);
+            drawing_manager.drawTrackedObject(img, output_stracks[i], motion_state_info_record,
+                                              tracker.get_color(output_stracks[i].track_id));
         }
 
+        // FPS
         int show_fps = (total_us > 0) ? (num_frames * 1000000LL / total_us) : 0;
-        cv::putText(img, cv::format("frame: %d fps: %d num: %ld", num_frames, show_fps, output_stracks.size()),
-                    cv::Point(0, 30), 0, 0.6, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
 
-        out_frame.create(img.rows + depth_vis.rows, img.cols, img.type());
-        img.copyTo(out_frame(cv::Rect(0, 0, img.cols, img.rows)));
+        // 全局信息
+        drawing_manager.drawGlobalInfo(img, num_frames, show_fps, output_stracks.size());
 
-        if (!depth_vis.empty()) {
-            if (depth_vis.size() != img.size()) {
-                cv::resize(depth_vis, depth_vis, img.size());
-            }
-            depth_vis.copyTo(out_frame(cv::Rect(0, img.rows, img.cols, depth_vis.rows)));
-        }
+        // 上下拼接
+        cv::Mat out_frame = drawing_manager.concatenateFrames(img, depth_vis);
 
-        // 保存图像或视频
-        if (config_manager.GetSaveMode() == "images" || config_manager.GetSaveMode() == "both") {
-            std::string save_path = config_manager.GetOutDir() + "/frame_" + std::to_string(num_frames) + ".jpg";
-            cv::imwrite(save_path, out_frame);
-        }
-
-        if (config_manager.GetSaveMode() == "video" || config_manager.GetSaveMode() == "both") {
-            writer.write(out_frame);
-        }
+        io_manager.saveFrame(out_frame, num_frames);
 
         // 显示图像（通过 DisplayManager）
         if (display_manager.isEnabled()) {
@@ -238,11 +194,7 @@ int run(char * videoPath) {
             }
         }
     }
-
     cap.release();
-    if (writer.isOpened()) {
-        writer.release();
-    }
 
     std::cout << "==========Summary===========" << endl;
     std::cout << "Infer Engine Compute FPS: " << (total_us > 0 ? (num_frames * 1000000LL / total_us) : 0) << std::endl;

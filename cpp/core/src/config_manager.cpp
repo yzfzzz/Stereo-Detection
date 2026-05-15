@@ -14,27 +14,27 @@ ConfigManager::ConfigManager(std::string config_path) {
     motion_acceleration_threshold = config["motion_state_engine"]["acceleration_threshold"].as<float>(1.5f);
 }
 
-std::string ConfigManager::GetYoloEnginePath() const {
+std::string ConfigManager::getYoloEnginePath() const {
     return yolo_trt_file;
 }
 
-std::string ConfigManager::GetDepthEnginePath() const {
+std::string ConfigManager::getDepthEnginePath() const {
     return depth_trt_file;
 }
 
-int ConfigManager::GetDepthInterval() const {
+int ConfigManager::getDepthInterval() const {
     return depth_interval;
 }
 
-std::string ConfigManager::GetSaveMode() const {
+std::string ConfigManager::getSaveMode() const {
     return save_mode;
 }
 
-std::string ConfigManager::GetOutDir() const {
+std::string ConfigManager::getOutDir() const {
     return out_dir;
 }
 
-bool ConfigManager::IsDisplayEnabled() const {
+bool ConfigManager::isDisplayEnabled() const {
     return is_display;
 }
 

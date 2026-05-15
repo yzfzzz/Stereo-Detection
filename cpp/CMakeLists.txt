@@ -108,4 +108,4 @@ include_directories(${PROJECT_SOURCE_DIR}/tools/include ${PROJECT_SOURCE_DIR}/co
 file(GLOB_RECURSE TOOL_SRCS ${PROJECT_SOURCE_DIR}/tools/src/*.cpp)
 file(GLOB_RECURSE CORE_SRCS ${PROJECT_SOURCE_DIR}/core/src/*.cpp)
 add_executable(main ${PROJECT_SOURCE_DIR}/main.cpp ${TOOL_SRCS} ${CORE_SRCS})
-target_link_libraries(main bytetrack yolo_infer depth yaml-cpp)
+target_link_libraries(main bytetrack yolo_infer depth yaml-cpp stdc++exp)

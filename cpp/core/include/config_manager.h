@@ -9,18 +9,18 @@ class ConfigManager {
     //  复杂解析加载配置文件
     ConfigManager(std::string config_path = "config.yaml");
 
-    std::string GetYoloEnginePath() const;
+    std::string getYoloEnginePath() const;
 
-    std::string GetDepthEnginePath() const;
+    std::string getDepthEnginePath() const;
 
-    int GetDepthInterval() const;
+    int getDepthInterval() const;
 
-    std::string GetSaveMode() const;
+    std::string getSaveMode() const;
 
-    std::string GetOutDir() const;
+    std::string getOutDir() const;
 
-    bool IsDisplayEnabled() const;
-    int getMotionSmaWindowSize() const;
+    bool  isDisplayEnabled() const;
+    int   getMotionSmaWindowSize() const;
     float getMotionVelocityThreshold() const;
     float getMotionAccelerationThreshold() const;
 
