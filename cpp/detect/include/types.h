@@ -1,11 +1,11 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <string>
+#include <array>
 
 struct Detection {
   // x1, y1, x2, y2
-  float bbox[4];
+  std::array<float, 4> bbox;
   float conf;
   int classId;
 };

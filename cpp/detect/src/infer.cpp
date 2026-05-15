@@ -288,7 +288,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
         int       pos;
         Detection det;
         auto      get_effective_detection = [&]() {
-            memcpy(det.bbox, &outputData[pos], 4 * sizeof(float));
+            memcpy(det.bbox.data(), &outputData[pos], 4 * sizeof(float));
             det.conf    = outputData[pos + 4];
             det.classId = (int) outputData[pos + 5];
             vDetections.push_back(det);
@@ -309,7 +309,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     }
 
     for (size_t j = 0; j < vDetections.size(); j++) {
-        scale_bbox(img, vDetections[j].bbox, input_w, input_h);
+        scale_bbox(img, vDetections[j].bbox.data(), input_w, input_h);
     }
 
     return vDetections;
