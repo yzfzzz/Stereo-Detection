@@ -2,18 +2,20 @@
 
 ConfigManager::ConfigManager(std::string config_path) {
     config                        = YAML::LoadFile(config_path);
-    yolo_trt_file                 = config["yolo_engine"].as<std::string>();
-    depth_trt_file                = config["depth_engine"].as<std::string>();
-    depth_interval                = config["depth_interval"].as<int>(1);
-    save_mode                     = config["save_mode"].as<std::string>("none");
-    out_dir                       = config["out_dir"].as<std::string>("out_dir");
-    is_display                    = config["is_display"].as<bool>(false);
+    is_display                    = config["display_manager"]["is_display"].as<bool>(false);
     
-    yolo_nms_thresh               = config["yolo_nms_thresh"].as<float>(0.4f);
-    yolo_conf_thresh              = config["yolo_conf_thresh"].as<float>(0.25f);
+    yolo_trt_file                 = config["yolo"]["yolo_engine"].as<std::string>();
+    yolo_nms_thresh               = config["yolo"]["yolo_nms_thresh"].as<float>(0.4f);
+    yolo_conf_thresh              = config["yolo"]["yolo_conf_thresh"].as<float>(0.25f);
+
+    depth_trt_file                = config["depth"]["depth_engine"].as<std::string>();
+    depth_interval                = config["depth"]["depth_interval"].as<int>(1);
+
+    is_save                       = config["io_manager"]["is_save"].as<bool>(false);
+    save_mode                     = config["io_manager"]["save_mode"].as<std::string>("none");
+    out_dir                       = config["io_manager"]["out_dir"].as<std::string>("out_dir");
 
     // 运动状态引擎相关配置
-    motion_sma_window_size        = config["motion_state_engine"]["sma_window_size"].as<int>(5);
     motion_velocity_threshold     = config["motion_state_engine"]["velocity_threshold"].as<float>(5.0f);
     motion_acceleration_threshold = config["motion_state_engine"]["acceleration_threshold"].as<float>(1.5f);
     kf_process_noise_cov          = config["motion_state_engine"]["kf_process_noise_cov"].as<float>(2e-2f);
@@ -44,8 +46,8 @@ bool ConfigManager::isDisplayEnabled() const {
     return is_display;
 }
 
-int ConfigManager::getMotionSmaWindowSize() const {
-    return motion_sma_window_size;
+bool ConfigManager::isSaveEnabled() const {
+    return is_save;
 }
 
 float ConfigManager::getMotionVelocityThreshold() const {

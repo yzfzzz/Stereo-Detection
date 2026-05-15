@@ -20,7 +20,8 @@ class ConfigManager {
     std::string getOutDir() const;
 
     bool  isDisplayEnabled() const;
-    int   getMotionSmaWindowSize() const;
+    bool  isSaveEnabled() const;
+    
     float getMotionVelocityThreshold() const;
     float getMotionAccelerationThreshold() const;
 
@@ -37,7 +38,8 @@ class ConfigManager {
     std::string out_dir;
     int         depth_interval;
     bool        is_display;
-    int         motion_sma_window_size;
+    bool        is_save;
+    
     float       motion_velocity_threshold;
     float       motion_acceleration_threshold;
     
