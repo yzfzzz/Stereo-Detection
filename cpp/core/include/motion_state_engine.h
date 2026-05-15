@@ -43,7 +43,8 @@ const std::map<std::pair<MotionState, MotionState>, std::string> MOTION_STR_MAP 
 
 class MotionStateEngine {
   public:
-    MotionStateEngine(float velocity_threshold = 5.0f, float acceleration_threshold = 1.5f);
+    MotionStateEngine(float velocity_threshold = 5.0f, float acceleration_threshold = 1.5f,
+                      float kf_process_noise_cov = 2e-2f, float kf_measurement_noise_cov = 5e-2f);
 
     MotionStateInfoRecord computeMotionState(int track_id, float raw_depth, double timestamp);
 
@@ -62,4 +63,6 @@ class MotionStateEngine {
 
     float velocity_threshold_;
     float acceleration_threshold_;
+    float kf_process_noise_cov_;
+    float kf_measurement_noise_cov_;
 };

@@ -5,10 +5,13 @@
 #include <opencv2/core/operations.hpp>
 #include <utility>
 
-MotionStateEngine::MotionStateEngine(float velocity_threshold, float acceleration_threshold) :
+MotionStateEngine::MotionStateEngine(float velocity_threshold, float acceleration_threshold,
+                                     float kf_process_noise_cov, float kf_measurement_noise_cov) :
 
     velocity_threshold_(velocity_threshold),
-    acceleration_threshold_(acceleration_threshold) {}
+    acceleration_threshold_(acceleration_threshold),
+    kf_process_noise_cov_(kf_process_noise_cov),
+    kf_measurement_noise_cov_(kf_measurement_noise_cov) {}
 
 MotionStateInfoRecord MotionStateEngine::computeMotionState(int track_id, float raw_value, double timestamp) {
     if (raw_value <= 0.0f) {
@@ -37,11 +40,11 @@ MotionStateInfoRecord MotionStateEngine::computeMotionState(int track_id, float 
         // 过程噪声协方差矩阵 Q
         // (决定系统的平滑度，值越小越平滑但响应越慢，值越大越灵敏但抗噪弱)
         // [由于加速度本身也是会变的，这里可以设置小一点]
-        cv::setIdentity(state.kf.processNoiseCov, cv::Scalar::all(2e-2));
+        cv::setIdentity(state.kf.processNoiseCov, cv::Scalar::all(kf_process_noise_cov_));
 
         // 测量噪声协方差矩阵 R
         // (决定对当前传入雷达/双目数值的信任度，测量噪声大则增大此值)
-        cv::setIdentity(state.kf.measurementNoiseCov, cv::Scalar::all(5e-2));
+        cv::setIdentity(state.kf.measurementNoiseCov, cv::Scalar::all(kf_measurement_noise_cov_));
 
         // 误差协方差矩阵 P (初始的置信度，随便设个稍微大点的值)
         cv::setIdentity(state.kf.errorCovPost, cv::Scalar::all(1));

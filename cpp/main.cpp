@@ -27,13 +27,13 @@ int run(char * videoPath) {
     if (!cap.isOpened()) {
         return 0;
     }
-    int  img_w   = cap.get(CAP_PROP_FRAME_WIDTH);
-    int  img_h   = cap.get(CAP_PROP_FRAME_HEIGHT);
-    int  fps     = cap.get(CAP_PROP_FPS);
-    long n_frame = static_cast<long>(cap.get(CAP_PROP_FRAME_COUNT));
-    cout << "Total frames: " << n_frame << endl;
+    int  img_w            = cap.get(CAP_PROP_FRAME_WIDTH);
+    int  img_h            = cap.get(CAP_PROP_FRAME_HEIGHT);
+    int  fps              = cap.get(CAP_PROP_FPS);
+    long total_frames_num = static_cast<long>(cap.get(CAP_PROP_FRAME_COUNT));
+    cout << "Total frames: " << total_frames_num << endl;
 
-    // =========ConfigManager 读取配置文件=========
+    // 读取配置文件
     ConfigManager  config_manager("config.yaml");
     // 文件读写，落盘保存
     IOManager      io_manager(config_manager, fps, img_w, img_h * 2);
@@ -43,11 +43,13 @@ int run(char * videoPath) {
     DisplayManager display_manager(config_manager.isDisplayEnabled(), "Detection Result", cv::Size(img_w, img_h * 2));
     // 运动状态引擎（负责计算运动状态）
     MotionStateEngine motion_state_engine(config_manager.getMotionVelocityThreshold(),
-                                          config_manager.getMotionAccelerationThreshold());
+                                          config_manager.getMotionAccelerationThreshold(),
+                                          config_manager.getKfProcessNoiseCov(),
+                                          config_manager.getKfMeasurementNoiseCov());
 
     // =========YOLOv8 predictor=========
     Logger                          logger;
-    YoloDetector                    detector(config_manager.getYoloEnginePath(), 0, 0.35, 0.1);
+    YoloDetector                    detector(config_manager.getYoloEnginePath(), 0, config_manager.getYoloNmsThresh(), config_manager.getYoloConfThresh());
     // =========Depth predictor=========
     std::unique_ptr<BaseDepthModel> depth_model;
     if (config_manager.getDepthEnginePath().find("depth_anything") != std::string::npos) {

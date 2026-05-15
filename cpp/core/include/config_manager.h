@@ -24,6 +24,10 @@ class ConfigManager {
     float getMotionVelocityThreshold() const;
     float getMotionAccelerationThreshold() const;
 
+    float getYoloNmsThresh() const;
+    float getYoloConfThresh() const;
+    float getKfProcessNoiseCov() const;
+    float getKfMeasurementNoiseCov() const;
 
   private:
     YAML::Node  config;
@@ -36,4 +40,9 @@ class ConfigManager {
     int         motion_sma_window_size;
     float       motion_velocity_threshold;
     float       motion_acceleration_threshold;
+    
+    float yolo_nms_thresh;
+    float yolo_conf_thresh;
+    float kf_process_noise_cov;
+    float kf_measurement_noise_cov;
 };
