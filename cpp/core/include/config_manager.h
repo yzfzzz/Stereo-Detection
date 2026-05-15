@@ -1,0 +1,39 @@
+#pragma once
+#include <yaml-cpp/yaml.h>
+
+#include <string>
+
+// 框架读取配置文件类
+class ConfigManager {
+  public:
+    //  复杂解析加载配置文件
+    ConfigManager(std::string config_path = "config.yaml");
+
+    std::string getYoloEnginePath() const;
+
+    std::string getDepthEnginePath() const;
+
+    int getDepthInterval() const;
+
+    std::string getSaveMode() const;
+
+    std::string getOutDir() const;
+
+    bool  isDisplayEnabled() const;
+    int   getMotionSmaWindowSize() const;
+    float getMotionVelocityThreshold() const;
+    float getMotionAccelerationThreshold() const;
+
+
+  private:
+    YAML::Node  config;
+    std::string yolo_trt_file;
+    std::string depth_trt_file;
+    std::string save_mode;
+    std::string out_dir;
+    int         depth_interval;
+    bool        is_display;
+    int         motion_sma_window_size;
+    float       motion_velocity_threshold;
+    float       motion_acceleration_threshold;
+};
