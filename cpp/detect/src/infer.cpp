@@ -315,7 +315,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     return vDetections;
 }
 
-void YoloDetector::draw_image(cv::Mat & img, std::vector<Detection> & inferResult) {
+void YoloDetector::drawImage(cv::Mat & img, std::vector<Detection> & inferResult) {
     // draw inference result on image
     for (size_t i = 0; i < inferResult.size(); i++) {
         cv::Scalar bboxColor(get_random_int(), get_random_int(), get_random_int());

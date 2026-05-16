@@ -1,16 +1,11 @@
 #ifndef PUBLIC_H
 #define PUBLIC_H
 
-#include <chrono>
 #include <cmath>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <map>
 #include <string.h>
 #include <string>
 #include <unistd.h>
-#include <vector>
 
 #include <NvInfer.h>
 #include <cuda_fp16.h>
