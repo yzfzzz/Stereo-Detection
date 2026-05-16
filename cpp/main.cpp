@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 
+#include <array>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -42,14 +43,13 @@ int run(char * videoPath) {
     // 显示管理器（负责窗口管理、显示、鼠标点击等）
     DisplayManager display_manager(config_manager.isDisplayEnabled(), "Detection Result", cv::Size(img_w, img_h * 2));
     // 运动状态引擎（负责计算运动状态）
-    MotionStateEngine motion_state_engine(config_manager.getMotionVelocityThreshold(),
-                                          config_manager.getMotionAccelerationThreshold(),
-                                          config_manager.getKfProcessNoiseCov(),
-                                          config_manager.getKfMeasurementNoiseCov());
+    MotionStateEngine motion_state_engine(
+        config_manager.getMotionVelocityThreshold(), config_manager.getMotionAccelerationThreshold(),
+        config_manager.getKfProcessNoiseCov(), config_manager.getKfMeasurementNoiseCov());
 
     // =========YOLOv8 predictor=========
-    Logger                          logger;
-    YoloDetector                    detector(config_manager.getYoloEnginePath(), 0, config_manager.getYoloNmsThresh(), config_manager.getYoloConfThresh());
+    YoloDetector                    detector(config_manager.getYoloEnginePath(), 0, config_manager.getYoloNmsThresh(),
+                                             config_manager.getYoloConfThresh());
     // =========Depth predictor=========
     std::unique_ptr<BaseDepthModel> depth_model;
     if (config_manager.getDepthEnginePath().find("depth_anything") != std::string::npos) {
@@ -62,7 +62,7 @@ int run(char * videoPath) {
         std::cerr << "Unknown depth engine type: " << config_manager.getDepthEnginePath() << std::endl;
         return -1;
     }
-    depth_model->Init(config_manager.getDepthEnginePath(), logger);
+    depth_model->Init(config_manager.getDepthEnginePath());
 
     // ByteTrack tracker
     BYTETracker tracker(fps, 30);
@@ -129,9 +129,9 @@ int run(char * videoPath) {
         // yolo output format to bytetrack input format, and filter bbox by class id
         std::vector<Object> objects;
         for (size_t j = 0; j < res.size(); j++) {
-            float * bbox    = res[j].bbox;
-            float   conf    = res[j].conf;
-            int     classId = res[j].classId;
+            std::array<float, 4> bbox    = res[j].bbox;
+            float                conf    = res[j].conf;
+            int                  classId = res[j].classId;
 
             if (is_tracking_class(classId)) {
                 cv::Rect_<float> rect(bbox[0], bbox[1], (bbox[2] - bbox[0]), (bbox[3] - bbox[1]));
@@ -163,16 +163,28 @@ int run(char * videoPath) {
             int class_id = output_stracks[i].class_id;
             int track_id = output_stracks[i].track_id;
 
-            float  current_depth   = motion_state_engine.getObjectDepth(result_depth, output_stracks[i], img.size());
             // 获取时间戳 (秒)
             double frame_timestamp = std::chrono::duration<double>(end.time_since_epoch()).count();
 
-            // 计算运动状态
+// 计算运动状态
+#if defined(ENABLE_TIMER)
+            float current_depth =
+                DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("5.Motion Engine getObjectDepth", motion_state_engine,
+                                                       getObjectDepth, result_depth, output_stracks[i], img.size());
+            MotionStateInfoRecord motion_state_info_record =
+                DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("6.Motion Engine computeMotionState", motion_state_engine,
+                                                       computeMotionState, track_id, current_depth, frame_timestamp);
+            DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("7.Drawing Manager", drawing_manager, drawTrackedObject, img,
+                                                   output_stracks[i], motion_state_info_record,
+                                                   tracker.get_color(output_stracks[i].track_id));
+
+#else
+            float current_depth = motion_state_engine.getObjectDepth(result_depth, output_stracks[i], img.size());
             MotionStateInfoRecord motion_state_info_record =
                 motion_state_engine.computeMotionState(track_id, current_depth, frame_timestamp);
-
             drawing_manager.drawTrackedObject(img, output_stracks[i], motion_state_info_record,
                                               tracker.get_color(output_stracks[i].track_id));
+#endif
         }
 
         // FPS
