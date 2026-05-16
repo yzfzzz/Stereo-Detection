@@ -6,16 +6,6 @@
 #include <iostream>
 #include <memory>
 
-// TensorRT Logger 也可以放在通用的地方
-class Logger : public nvinfer1::ILogger {
-  public:
-    void log(Severity severity, const char * msg) noexcept override {
-        if (severity <= Severity::kWARNING) {
-            std::cout << "[Depth TensorRT] " << msg << std::endl;
-        }
-    }
-};
-
 BaseDepthModel::BaseDepthModel() :
     runtime(nullptr),
     engine(nullptr),
@@ -51,7 +41,7 @@ BaseDepthModel::~BaseDepthModel() {
 #endif
 }
 
-void BaseDepthModel::Init(const std::string & engine_path, nvinfer1::ILogger & logger) {
+void BaseDepthModel::Init(const std::string & engine_path) {
     std::ifstream engineStream(engine_path, std::ios::binary);
     if (!engineStream.is_open()) {
         std::cerr << "Failed to open engine file: " << engine_path << std::endl;

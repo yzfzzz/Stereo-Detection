@@ -1,5 +1,7 @@
 #pragma once
 
+#include "public.h"
+
 #include <cuda_runtime_api.h>
 #include <NvInfer.h>
 
@@ -13,7 +15,7 @@ class BaseDepthModel {
     virtual ~BaseDepthModel();
 
     // 通用的 Engine 加载和显存分配流程
-    virtual void Init(const std::string & engine_path, nvinfer1::ILogger & logger);
+    virtual void Init(const std::string & engine_path);
 
     // 暴露给外部调用的统一推理接口
     virtual std::pair<cv::Mat, cv::Mat> Predict(const cv::Mat & image);
@@ -35,4 +37,5 @@ class BaseDepthModel {
     int                           input_h, input_w;            // 模型输出的尺寸
     int                           origin_img_w, origin_img_h;  // 原始输入图像的尺寸
     float *                       output_data;
+    Logger                        logger;
 };
