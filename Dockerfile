@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libyaml-cpp-dev \
     libeigen3-dev \
     libopencv-dev \
+    pybind11-dev \
     clangd \
     clang-format \
     build-essential \
@@ -33,8 +34,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 全局设置 pip 使用清华大学镜像源加速
 ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 安装 ultralytics
-RUN pip install --no-cache-dir ultralytics onnxsim timm
+# 安装 python 依赖
+RUN pip install --no-cache-dir ultralytics onnxsim timm carla
 
 # 设置工作目录
 WORKDIR /workspace
