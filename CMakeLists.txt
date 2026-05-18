@@ -27,8 +27,11 @@ if(TARGET_PLATFORM STREQUAL "AUTO")
     set(_jetson_hint_lc "")
 
     if(EXISTS "/proc/device-tree/model")
-      file(READ "/proc/device-tree/model" _jetson_model_raw)
-      string(REPLACE "\000" "" _jetson_model_raw "${_jetson_model_raw}")
+      execute_process(
+        COMMAND sh -c "tr -d '\\000' < /proc/device-tree/model"
+        OUTPUT_VARIABLE _jetson_model_raw
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
       string(APPEND _jetson_hint " ${_jetson_model_raw}")
     endif()
 
