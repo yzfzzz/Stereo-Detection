@@ -83,6 +83,9 @@ elseif(TARGET_PLATFORM STREQUAL "TX2")
 elseif(TARGET_PLATFORM STREQUAL "X86_64")
   # 按需增删架构
   set(CUDA_ARCH "-gencode arch=compute_75,code=sm_75 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_120,code=sm_120")
+  if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
+    set(CMAKE_BUILD_PARALLEL_LEVEL 16)
+  endif()
   message(STATUS "x86_64 config enabled")
 
 else()
@@ -203,7 +206,6 @@ if(ENABLE_PYBIND)
       core
       tools
       yaml-cpp
-      stdc++exp
   )
   set_target_properties(depth_detection PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/python

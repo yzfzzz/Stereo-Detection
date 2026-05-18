@@ -74,33 +74,6 @@ class DisplayManager {
     friend void onMouse(int event, int x, int y, int flags, void * userdata);
 };
 
-class DepthPlotter {
-  public:
-    // 构造函数，传入输出目录
-    DepthPlotter(const std::string & out_dir = "out_dir/depth_trend");
-    ~DepthPlotter();
-
-    // 更新某个给定 track_id 在指定时间的深度值
-    // frame_id 是横坐标之一可选（为了更规整的显示），这里我们使用帧索引作为 X 轴可能更好画
-    // 但是您提供了 frame_timestamp，我们也可以同时存。不过通常为了等距作图画折线，存 frame_id 就够了。
-    void update(int track_id, int frame_id, float current_depth, float velocity);
-
-    // 把画好的趋势图保存到文件中
-    void savePlots();
-
-  private:
-    std::string out_dir_;
-
-    // 记录 track_id 的深度历史：对应关系 -> frame_id, depth
-    std::map<int, std::vector<std::tuple<int, float, float>>> track_depth_history_;  // frame_id, depth, velocity
-
-    // 在一个子区域 ROI 中画出一条折线图
-    void drawSinglePlot(cv::Mat &                                          canvas,
-                        const cv::Rect &                                   roi,
-                        int                                                track_id,
-                        const std::vector<std::tuple<int, float, float>> & history) const;
-};
-
 class DrawingManager {
   public:
     // 传入追踪器引用（或者颜色列表）以及类别名称列表，以便画图时获取颜色和名字
