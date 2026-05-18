@@ -176,7 +176,7 @@ target_link_libraries(tools ${OpenCV_LIBS})
 # ======== main execute file ========
 find_package(yaml-cpp REQUIRED)
 add_executable(main ${CPP_SOURCE_DIR}/main.cpp)
-target_link_libraries(main bytetrack yolo_infer depth core tools yaml-cpp stdc++exp)
+target_link_libraries(main bytetrack yolo_infer depth core tools yaml-cpp)
 
 # ==================== pybind11 (Jetson 禁用) ====================
 option(ENABLE_PYBIND "Build python pybind module" ON)
