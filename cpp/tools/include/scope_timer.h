@@ -1,8 +1,13 @@
 #pragma once
+#include <math.h>
+
+#include <algorithm>
 #include <chrono>
 #include <map>
+#include <numeric>
 #include <string>
 #include <utility>
+#include <vector>
 
 class ScopedTimer {
   public:
@@ -10,12 +15,31 @@ class ScopedTimer {
 
     ~ScopedTimer();
 
-    static std::map<std::string, double> & GetScopedTimers();
+    static std::map<std::string, std::vector<double>> & GetScopedTimers();
 
   private:
     std::string                           name_;
     std::chrono::steady_clock::time_point start_;
 };
+
+// 计算百分位数 (P95, P99 等)
+inline double calculatePercentile(std::vector<double> data, double percentile) {
+    if (data.empty()) {
+        return 0.0;
+    }
+    std::sort(data.begin(), data.end());
+    size_t index = static_cast<size_t>(std::ceil(percentile / 100.0 * data.size())) - 1;
+    return data[std::min(index, data.size() - 1)] / 1000.0;
+}
+
+// 计算平均值
+inline double calculateAverage(const std::vector<double> data) {
+    if (data.empty()) {
+        return 0.0;
+    }
+    double sum = std::accumulate(data.begin(), data.end(), 0.0);
+    return (sum / data.size()) / 1000.0;
+}
 
 // 基础实现：接受任意可调用对象
 template <typename Func>

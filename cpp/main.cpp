@@ -1,11 +1,7 @@
-#include "BYTETracker.h"
+
 #include "config.h"
 #include "config_manager.h"
-#include "depth_anything.h"
-#include "infer.h"
 #include "io_manager.h"
-#include "lite_mono.h"
-#include "motion_state_engine.h"
 #include "pipeline.h"
 #include "scope_timer.h"
 #include "visual_manager.h"
@@ -13,10 +9,10 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 
-#include <array>
+#include <cstdio>
 #include <iostream>
-#include <memory>
 #include <opencv2/core/mat.hpp>
+#include <opencv2/core/operations.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -36,7 +32,12 @@ cv::Mat draw_one_frame(cv::Mat &                  img,
 
         auto it = frame_result.motion_records.find(track.track_id);
         if (it != frame_result.motion_records.end()) {
+#if defined(ENABLE_TIMER)
+            DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("6.Drawing Manager", drawing_manager, drawTrackedObject, img, track,
+                                                   it->second, get_color_func(track.track_id));
+#else
             drawing_manager.drawTrackedObject(img, track, it->second, get_color_func(track.track_id));
+#endif
         }
     }
     // FPS
@@ -49,10 +50,9 @@ cv::Mat draw_one_frame(cv::Mat &                  img,
     return out_frame;
 }
 
-int run(char * videoPath) {
+int run(char * video_path) {
     // read video
-    std::string      input_video_path = std::string(videoPath);
-    cv::VideoCapture cap(input_video_path);
+    cv::VideoCapture cap(video_path);
     if (!cap.isOpened()) {
         return 0;
     }
@@ -73,37 +73,32 @@ int run(char * videoPath) {
     // 显示管理器（负责窗口管理、显示、鼠标点击等）
     DisplayManager display_manager(config_manager.isDisplayEnabled(), "Detection Result", cv::Size(img_w, img_h * 2));
 
-    int       num_frames = 0;
-    long long total_us   = 0;
-    cv::Mat   img;
+    int     num_frames = 0;
+    double  total_us   = 0;
+    cv::Mat img;
 
     while (true) {
-#if defined(ENABLE_TIMER)
-        if (!DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("1.Cap Read", cap, read, img)) {
-            break;
-        }
-#else
-        if (!cap.read(img)) {
-            break;
-        }
-#endif
-        if (img.empty()) {
-            break;
-        }
         num_frames++;
         if (num_frames % 100 == 0) {
-            cout << "Processing frame " << num_frames << " ("
-                 << (total_us > 0 ? (num_frames * 1000000LL / total_us) : 0) << " fps)" << endl;
+            printf("Processing frame %d (%.2f fps)\n", num_frames,
+                   (total_us > 0 ? (num_frames * 1000000LL / total_us) : 0));
         }
-
-        auto start = std::chrono::system_clock::now();
-
-        // 执行推理流水线
         FrameResult frame_result;
+#if defined(ENABLE_TIMER)
+        if (!DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("1.Cap Read", cap, read, img) || img.empty()) {
+            break;
+        }
+        // 执行推理流水线
+        std::string name = "Infer Pipeline";
+        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF(name, pipeline, process, img, num_frames, frame_result);
+        total_us += ScopedTimer::GetScopedTimers()[name].back();  // 获取刚刚这次推理的耗时
+#else
+        if (!cap.read(img) || img.empty()) {
+            break;
+        }
         pipeline.process(img, num_frames, frame_result);
 
-        auto end = std::chrono::system_clock::now();
-        total_us += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+#endif
 
         // 画图
         cv::Mat out_frame = draw_one_frame(
@@ -125,9 +120,11 @@ int run(char * videoPath) {
     cap.release();
 
     std::cout << "==========Summary===========" << endl;
-    std::cout << "Infer Engine Compute FPS: " << (total_us > 0 ? (num_frames * 1000000LL / total_us) : 0) << std::endl;
     for (auto & kv : ScopedTimer::GetScopedTimers()) {
-        std::cout << kv.first << ": " << (kv.second / 1000.0) / num_frames << " ms/frame" << std::endl;
+        double avg = calculateAverage(kv.second);
+        double p95 = calculatePercentile(kv.second, 95.0);
+        double p99 = calculatePercentile(kv.second, 99.0);
+        printf("[%s]: avg = %.2f ms, P95 = %.2f ms, P99 = %.2f ms (frame)\n", kv.first.c_str(), avg, p95, p99);
     }
 
     return 0;
