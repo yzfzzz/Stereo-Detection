@@ -32,7 +32,7 @@ void decode(float *      src,
 
 void nms(float * data, float kNmsThresh, int maxObjects, int numBoxElement, cudaStream_t stream);
 
-__inline__ void scale_bbox(cv::Mat & img, float bbox[4], int input_w, int input_h) {
+__inline__ void scale_bbox(const cv::Mat & img, float bbox[4], int input_w, int input_h) {
     float r_w   = input_w / (img.cols * 1.0);
     float r_h   = input_h / (img.rows * 1.0);
     float r     = std::min(r_w, r_h);
