@@ -3,10 +3,11 @@
 #include <cstdio>
 #include <iostream>
 #include <opencv2/core/operations.hpp>
-#include <utility>
 
-MotionStateEngine::MotionStateEngine(float velocity_threshold, float acceleration_threshold,
-                                     float kf_process_noise_cov, float kf_measurement_noise_cov) :
+MotionStateEngine::MotionStateEngine(float velocity_threshold,
+                                     float acceleration_threshold,
+                                     float kf_process_noise_cov,
+                                     float kf_measurement_noise_cov) :
 
     velocity_threshold_(velocity_threshold),
     acceleration_threshold_(acceleration_threshold),
@@ -90,8 +91,7 @@ MotionStateInfoRecord MotionStateEngine::computeMotionState(int track_id, float 
     MotionState accel_state     = MotionState::CONSTANT;
 
     // 此处假设为视差逻辑 (值变大=靠近)
-    if (current_velocity > velocity_threshold_ ||
-        (current_accel > acceleration_threshold_ && current_velocity > 0.0f)) {
+    if (current_velocity > velocity_threshold_) {
         direction_state = MotionState::APPROACH;
         if (current_accel > acceleration_threshold_) {
             accel_state = MotionState::ACCELE;
@@ -100,8 +100,7 @@ MotionStateInfoRecord MotionStateEngine::computeMotionState(int track_id, float 
         }
     }
     // 视差变小=远离
-    else if (current_velocity < -velocity_threshold_ ||
-             (current_accel < -acceleration_threshold_ && current_velocity < 0.0f)) {
+    else if (current_velocity < -velocity_threshold_) {
         direction_state = MotionState::MOVE_AWAY;
         if (current_accel < -acceleration_threshold_) {
             accel_state = MotionState::ACCELE;  // 远离时加速跑

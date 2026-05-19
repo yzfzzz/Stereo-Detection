@@ -17,7 +17,7 @@ class YoloDetector {
                  float             confThresh = kConfThresh,
                  int               numClass   = kNumClass);
     ~YoloDetector();
-    std::vector<Detection> inference(cv::Mat & img);
+    std::vector<Detection> inference(const cv::Mat & img);
     static void            drawImage(cv::Mat & img, std::vector<Detection> & inferResult);
 
   private:

@@ -1,0 +1,46 @@
+#pragma once
+#include "motion_state_engine.h"
+
+#include <opencv2/opencv.hpp>
+#include <unordered_map>
+#include <vector>
+
+enum FrameSource { VIDEO, CAMERA };
+
+struct FrameMeta {
+    FrameMeta() = default;
+
+    FrameMeta(int img_w, int img_h, double fps, FrameSource frame_source) :
+        img_w(img_w),
+        img_h(img_h),
+        fps(fps),
+        frame_source(frame_source) {}
+
+    int    img_w;
+    int    img_h;
+    double fps;
+
+    FrameSource frame_source;
+};
+
+struct InferOutputContext {
+    std::vector<STrack>                            tracked_objects;
+    cv::Mat                                        result_depth;
+    cv::Mat                                        depth_vis;
+    std::unordered_map<int, MotionStateInfoRecord> motion_records;
+};
+
+struct FrameInputContext {
+    FrameInputContext(int frame_id, FrameMeta meta) : frame_id(frame_id), meta(meta) {
+        if (meta.frame_source == FrameSource::VIDEO) {
+            timestamp = (meta.fps > 0.0) ? (frame_id / meta.fps) : 0.0;
+        } else if (meta.frame_source == FrameSource::CAMERA) {
+            timestamp = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+    }
+
+    int       frame_id;
+    FrameMeta meta;
+    double    timestamp;
+    cv::Mat   raw_img;
+};

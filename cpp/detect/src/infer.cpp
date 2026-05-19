@@ -203,7 +203,7 @@ YoloDetector::~YoloDetector() {
     delete runtime;
 }
 
-std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
+std::vector<Detection> YoloDetector::inference(const cv::Mat & img) {
     if (img.empty()) {
         return {};
     }
@@ -221,8 +221,7 @@ std::vector<Detection> YoloDetector::inference(cv::Mat & img) {
     // TensorRT inference - use appropriate API based on platform/TensorRT version
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions
-    void * bindings[] = { vBufferD[0], vBufferD[1] };
-    bool   status     = context->enqueueV2(bindings, stream, nullptr);
+    bool status = context->enqueueV2({ vBufferD[0], vBufferD[1] }, stream, nullptr);
 #else
     // For newer TensorRT versions on x86_64
     context->setTensorAddress("images", vBufferD[0]);

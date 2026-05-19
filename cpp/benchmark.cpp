@@ -11,6 +11,7 @@ class PipelineBenchmark : public benchmark::Fixture {
     cv::VideoCapture          cap;
     cv::Mat                   img;
     int                       num_frames = 0;
+    FrameMeta                 frame_meta;
 
     void SetUp(const ::benchmark::State & state) override {
         ConfigManager config_manager("config.yaml");
@@ -19,6 +20,8 @@ class PipelineBenchmark : public benchmark::Fixture {
         if (!cap.isOpened()) {
             throw std::runtime_error("Failed to open video");
         }
+        frame_meta = FrameMeta(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT), cap.get(CAP_PROP_FPS),
+                               FrameSource::VIDEO);
     }
 
     virtual void TearDown(benchmark::State & state) override {
@@ -29,13 +32,15 @@ class PipelineBenchmark : public benchmark::Fixture {
 
 BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessInference)(benchmark::State & state) {
     for (auto _ : state) {
-        if (!cap.read(img) || img.empty()) {
+        FrameInputContext frame_input_context(num_frames, frame_meta);
+        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
             cap.set(cv::CAP_PROP_POS_FRAMES, 0);  // 视频播完自动重头
             continue;
         }
         num_frames++;
-        FrameResult result;
-        pipeline->process(img, num_frames, result);
+
+        InferOutputContext infer_output_context;
+        pipeline->process(frame_input_context, infer_output_context);
     }
     state.SetItemsProcessed(state.iterations());
 }
