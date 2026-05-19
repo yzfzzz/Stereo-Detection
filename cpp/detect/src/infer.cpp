@@ -119,14 +119,7 @@ void YoloDetector::get_engine() {
             builder->createNetworkV2(1U << int(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH));
         IOptimizationProfile * profile = builder->createOptimizationProfile();
         IBuilderConfig *       config  = builder->createBuilderConfig();
-        // Set workspace size - use appropriate API based on platform/TensorRT version
-#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
-        // For Jetson Nano (ARM64) and older TensorRT versions
-        config->setMaxWorkspaceSize(1 << 30);  // 1 GB
-#else
-        // For newer TensorRT versions on x86_64
-        config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 1 << 30);  // 1 GB
-#endif
+
         IInt8Calibrator * pCalibrator = nullptr;
         if (bFP16Mode) {
             config->setFlag(BuilderFlag::kFP16);
