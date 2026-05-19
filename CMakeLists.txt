@@ -69,6 +69,7 @@ if(TARGET_PLATFORM STREQUAL "NANO2GB")
   if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
     set(CMAKE_BUILD_PARALLEL_LEVEL 2)
   endif()
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -maxrregcount=32")
   message(STATUS "Jetson Nano 2GB config enabled")
 
 elseif(TARGET_PLATFORM STREQUAL "TX2")
@@ -106,11 +107,6 @@ link_directories(/usr/local/cuda/lib64)
 # CUDA compilation options
 set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${CUDA_ARCH}")
 set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 --use_fast_math")
-
-# Options to reduce VRAM usage for Jetson
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -maxrregcount=32")
-endif()
 
 # ============= tensorrt ============
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
@@ -175,8 +171,24 @@ target_link_libraries(tools ${OpenCV_LIBS})
 
 # ======== main execute file ========
 find_package(yaml-cpp REQUIRED)
-add_executable(main ${CPP_SOURCE_DIR}/main.cpp)
+include_directories(${CPP_SOURCE_DIR}/include)
+file(GLOB_RECURSE MAIN_SRCS ${CPP_SOURCE_DIR}/src/*.cpp)
+add_executable(main ${CPP_SOURCE_DIR}/main.cpp ${MAIN_SRCS})
 target_link_libraries(main bytetrack yolo_infer depth core tools yaml-cpp)
+
+# ==================== Google Benchmark ====================
+option(ENABLE_BENCHMARK "Build benchmark tests" ON)
+
+if(ENABLE_BENCHMARK)
+    message(STATUS "Building benchmark tests")
+    # 查找 Google benchmark
+    find_package(benchmark REQUIRED)
+    add_executable(pipeline_test ${CPP_SOURCE_DIR}/benchmark.cpp ${MAIN_SRCS})
+    target_link_libraries(pipeline_test PRIVATE 
+        bytetrack yolo_infer depth core tools yaml-cpp benchmark::benchmark
+    )
+
+endif()
 
 # ==================== pybind11 (Jetson 禁用) ====================
 option(ENABLE_PYBIND "Build python pybind module" ON)
