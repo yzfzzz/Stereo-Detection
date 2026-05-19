@@ -8,7 +8,7 @@
 
 class Pipeline {
   public:
-    Pipeline(ConfigManager config_manager);
+    Pipeline(ConfigManager config_manager, FrameMeta frame_meta);
 
     // 核心推理接口，供正常业务和 Benchmark 调用
     void process(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);

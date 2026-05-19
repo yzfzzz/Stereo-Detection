@@ -15,13 +15,13 @@ class PipelineBenchmark : public benchmark::Fixture {
 
     void SetUp(const ::benchmark::State & state) override {
         ConfigManager config_manager("config.yaml");
-        pipeline = std::make_unique<Pipeline>(config_manager);
         cap.open("../data/shu/1shu_east_0514.mp4");  // 替换为你的测试视频路径
         if (!cap.isOpened()) {
             throw std::runtime_error("Failed to open video");
         }
         frame_meta = FrameMeta(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT), cap.get(CAP_PROP_FPS),
                                FrameSource::VIDEO);
+        pipeline   = std::make_unique<Pipeline>(config_manager, frame_meta);
     }
 
     virtual void TearDown(benchmark::State & state) override {

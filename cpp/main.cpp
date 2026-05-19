@@ -67,7 +67,7 @@ int run(char * video_path) {
     // 读取配置文件
     ConfigManager  config_manager("config.yaml");
     // 推理流水线（负责目标检测、深度估计、跟踪、运动状态判断等核心功能）
-    Pipeline       pipeline(config_manager);
+    Pipeline       pipeline(config_manager, frame_meta);
     // 文件读写，落盘保存
     IOManager      io_manager(config_manager, frame_meta.fps, frame_meta.img_w, frame_meta.img_h * 2);
     // 绘制管理器（负责绘制结果）

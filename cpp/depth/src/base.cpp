@@ -10,7 +10,7 @@ BaseDepthModel::BaseDepthModel() :
     runtime(nullptr),
     engine(nullptr),
     context(nullptr),
-    stream(nullptr),
+    stream(0),
     input_h(0),
     input_w(0),
     output_data(nullptr) {}
@@ -79,14 +79,14 @@ void BaseDepthModel::Init(const std::string & engine_path) {
     input_w           = input_dims.d[3];
 #endif
 
-#if defined(__aarch64__) || defined(__arm__)
-    stream = nullptr;
-#else
     cudaStreamCreate(&stream);
-#endif
+
     cudaMalloc(&buffer[0], 3 * input_h * input_w * sizeof(float));
     cudaMalloc(&buffer[1], input_h * input_w * sizeof(float));
     output_data = new float[input_h * input_w];
+
+    context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
+    context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
 }
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
@@ -107,8 +107,6 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
     context->enqueueV2(buffer, stream, nullptr);
 
 #else
-    context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
-    context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
 
     bool status = context->enqueueV3(stream);
     if (!status) {
@@ -149,3 +147,32 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::Postprocess() {
     cv::resize(colormap, colormap, cv::Size(origin_img_w, origin_img_h));
     return std::make_pair(depth_mat, colormap);
 }
+
+// 异步推理接口
+std::pair<cv::Mat, cv::Mat> BaseDepthModel::PredictAsync(const cv::Mat & image) {
+    std::vector<float> input = Preprocess(image);
+    // 数据异步拷贝至 GPU
+    cudaMemcpyAsync(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice, stream);
+// 异步推理
+#if NV_TENSORRT_MAJOR < 10
+    context->enqueueV2(buffer, stream, nullptr);
+
+#else
+    context->enqueueV3(stream);
+#endif
+    // 异步拷贝回 CPU
+    cudaMemcpyAsync(output_data, buffer[1], input_h * input_w * sizeof(float), cudaMemcpyDeviceToHost, stream);
+
+#if defined(ENABLE_TIMER)
+    DEBUG_FUNCTION_RUNNING_TIME_FUNC("3-2.DepthModel Infer Sync", cudaStreamSynchronize, stream);
+    std::pair<cv::Mat, cv::Mat> postprocess_result =
+        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3-3.DepthModel Postprocess", this, Postprocess);
+#else
+    cudaStreamSynchronize(stream);  // 等待 Depth 完成
+    std::pair<cv::Mat, cv::Mat> postprocess_result = Postprocess();
+
+#endif
+    return postprocess_result;
+}
+
+

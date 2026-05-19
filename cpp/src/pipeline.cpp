@@ -10,10 +10,11 @@
 
 #include <memory>
 
-Pipeline::Pipeline(ConfigManager config_manager) :
+Pipeline::Pipeline(ConfigManager config_manager, FrameMeta frame_meta) :
     config_manager_(config_manager),
     detector_(config_manager_.getYoloEnginePath(),
-              0,
+              frame_meta.img_w,
+              frame_meta.img_h,
               config_manager_.getYoloNmsThresh(),
               config_manager_.getYoloConfThresh()),
     tracker_(30, 30),  // 假设fps=30，或从config读取
@@ -40,7 +41,7 @@ void Pipeline::process(FrameInputContext & frame_input_context, InferOutputConte
     if (do_depth) {
 #if defined(ENABLE_TIMER)
         auto depth_infer_result =
-            DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3.Depth", depth_model_, Predict, frame_input_context.raw_img);
+            DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3.Depth", depth_model_, PredictAsync, frame_input_context.raw_img);
 #else
         auto depth_infer_result = depth_model_->Predict(frame_input_context.raw_img);
 #endif
@@ -54,7 +55,7 @@ void Pipeline::process(FrameInputContext & frame_input_context, InferOutputConte
 
 #if defined(ENABLE_TIMER)
     std::vector<Detection> res =
-        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("2.YOLO", detector_, inference, frame_input_context.raw_img);
+        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("2.YOLO", detector_, inferenceAsync, frame_input_context.raw_img);
 #else
     std::vector<Detection> res = detector_.inference(frame_input_context.raw_img);
 #endif
