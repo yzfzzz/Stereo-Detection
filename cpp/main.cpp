@@ -71,7 +71,7 @@ int run(char * video_path) {
     // 绘制管理器（负责绘制结果）
     DrawingManager drawing_manager(vClassNames);
     // 显示管理器（负责窗口管理、显示、鼠标点击等）
-    DisplayManager display_manager(config_manager.isDisplayEnabled(), "Detection Result", cv::Size(img_w, img_h * 2));
+    DisplayManager display_manager(config_manager, "Detection Result", cv::Size(img_w, img_h * 2));
 
     int     num_frames = 0;
     double  total_us   = 0;
@@ -118,7 +118,7 @@ int run(char * video_path) {
         }
     }
     cap.release();
-
+#if defined(ENABLE_TIMER)
     std::cout << "==========Summary===========" << endl;
     for (auto & kv : ScopedTimer::GetScopedTimers()) {
         double avg = calculateAverage(kv.second);
@@ -126,6 +126,7 @@ int run(char * video_path) {
         double p99 = calculatePercentile(kv.second, 99.0);
         printf("[%s]: avg = %.2f ms, P95 = %.2f ms, P99 = %.2f ms (frame)\n", kv.first.c_str(), avg, p95, p99);
     }
+#endif
 
     return 0;
 }

@@ -1,6 +1,7 @@
 #include "visual_manager.h"
 
 #include "config.h"
+#include "config_manager.h"
 
 #include <experimental/filesystem>
 
@@ -16,8 +17,8 @@ void onMouse(int event, int x, int y, int flags, void * userdata) {
     }
 }
 
-DisplayManager::DisplayManager(bool enabled, const std::string & window_name, cv::Size display_size) :
-    enabled_(enabled),
+DisplayManager::DisplayManager(ConfigManager & config, const std::string & window_name, cv::Size display_size) :
+    enabled_(config.isDisplayEnabled()),
     window_name_(window_name),
     display_size_(display_size) {
     if (enabled_) {
