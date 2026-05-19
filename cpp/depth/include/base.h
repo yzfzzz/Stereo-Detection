@@ -19,6 +19,7 @@ class BaseDepthModel {
 
     // 暴露给外部调用的统一推理接口
     virtual std::pair<cv::Mat, cv::Mat> Predict(const cv::Mat & image);
+    virtual std::pair<cv::Mat, cv::Mat> PredictAsync(const cv::Mat & image);
 
   protected:
     // 子类必须实现的专属预处理
