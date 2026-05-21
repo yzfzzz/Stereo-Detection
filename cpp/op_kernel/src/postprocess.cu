@@ -144,17 +144,6 @@ __global__ void normlize_color_kernel(float* src,
 
     // colormap
     dst_colormap[idy * input_w + idx] = C_DEVICE_COLOR_MAP[gray_val]; // BGR
-    if(idx < 10 && idy < 2){
-        printf("cuda: depth value: %d\n", (int)gray_val);
-        printf("C_DEVICE_COLOR_MAP[gray_val] : (%d, %d, %d)\n", 
-            (int)C_DEVICE_COLOR_MAP[gray_val].x, 
-            (int)C_DEVICE_COLOR_MAP[gray_val].y, 
-            (int)C_DEVICE_COLOR_MAP[gray_val].z);
-        printf("cuda: colormap value (BGR): (%d, %d, %d)\n", 
-            (int)dst_colormap[idy * input_w + idx].x, 
-            (int)dst_colormap[idy * input_w + idx].y, 
-            (int)dst_colormap[idy * input_w + idx].z);
-    }
 }
 
 __global__ void resize_kernel(uchar* src_depth, uchar3* src_colormap, uchar* dst_depth,  uchar3* dst_colormap,
@@ -346,8 +335,6 @@ void initColorMapTable() {
         host_color_table[i].z = cv::saturate_cast<uchar>(r[i] * 255.0f + 0.5f);  // B 通道
         host_color_table[i].y = cv::saturate_cast<uchar>(g[i] * 255.0f + 0.5f);  // G 通道
         host_color_table[i].x = cv::saturate_cast<uchar>(b[i] * 255.0f + 0.5f);  // R 通道
-
-        printf("[DEBUG] Host Color Map Table [%d]: R=%d, G=%d, B=%d\n", i, host_color_table[i].x, host_color_table[i].y, host_color_table[i].z);
     }
     cudaMemcpyToSymbol(C_DEVICE_COLOR_MAP, host_color_table, sizeof(uchar3) * 256);
 }

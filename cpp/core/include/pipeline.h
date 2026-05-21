@@ -18,6 +18,9 @@ class Pipeline {
 
 
   private:
+    void postProcess(FrameInputContext & frame_input_context,
+                     InferOutputContext & infer_output_context,
+                     const std::vector<Detection> &res);
 
     bool isTrackingClass(int class_id) {
         for (auto & c : trackClasses) {

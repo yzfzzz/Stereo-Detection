@@ -18,8 +18,9 @@ class BaseDepthModel {
     // 通用的 Engine 加载和显存分配流程
     virtual void Init(const std::string & engine_path, int img_w, int img_h);
 
-    // 暴露给外部调用的统一推理接口
+    // 同步推理
     virtual std::pair<cv::Mat, cv::Mat> Predict(const cv::Mat & image);
+    // 异步推理
     virtual void                        PredictAsync(const cv::Mat & image);
     virtual void                        WaitAsync();
     virtual std::pair<cv::Mat, cv::Mat> GetPredictResultAsync();
@@ -29,8 +30,6 @@ class BaseDepthModel {
     // 子类必须实现的专属预处理
     virtual std::vector<float> Preprocess(const cv::Mat & image) = 0;
 
-    // 可选的后处理接口，默认实现是直接返回原始深度图，颜色图
-    virtual std::pair<cv::Mat, cv::Mat> Postprocess();
 
   protected:
     nvinfer1::IRuntime *          runtime;

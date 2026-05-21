@@ -156,55 +156,17 @@ void BaseDepthModel::Init(const std::string & engine_path, int img_w, int img_h)
 }
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
-// 1. 预处理
-#if defined(ENABLE_TIMER)
 
-    std::vector<float> input =
-        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3-1.DepthModel Preprocess", this, Preprocess, image);
-#else
     std::vector<float> input = Preprocess(image);
+    cudaMemcpy(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice);
 
-#endif
-
-    cudaMemcpyAsync(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice, stream);
-
-    // 2. 推理
-#if NV_TENSORRT_MAJOR < 10
-    context->enqueueV2(buffer, stream, nullptr);
-
-#else
-
-    bool status = context->enqueueV3(stream);
+    bool status = context->executeV2(buffer);
     if (!status) {
         std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
         return {};
     }
 
-#endif
-#if defined(ENABLE_TIMER)
-    DEBUG_FUNCTION_RUNNING_TIME_FUNC("3-2.DepthModel Infer Sync", cudaStreamSynchronize, stream);
-#else
-    cudaStreamSynchronize(stream);
-
-#endif
-
-    // 3. 后处理：只拷贝数据，返回原始深度矩阵
-    cudaMemcpyAsync(output_data, buffer[1], input_h * input_w * sizeof(float), cudaMemcpyDeviceToHost, stream);
-    cudaStreamSynchronize(stream);
-
-#if defined(ENABLE_TIMER)
-
-    std::pair<cv::Mat, cv::Mat> postprocess_result =
-        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_PTR("3-3.DepthModel Postprocess", this, Postprocess);
-#else
-    std::pair<cv::Mat, cv::Mat> postprocess_result = Postprocess();
-
-#endif
-
-    return postprocess_result;
-}
-
-std::pair<cv::Mat, cv::Mat> BaseDepthModel::Postprocess() {
+    cudaMemcpy(output_data, buffer[1], input_h * input_w * sizeof(float), cudaMemcpyDeviceToHost);
     cv::Mat depth_mat(input_h, input_w, CV_32FC1, output_data);
     cv::normalize(depth_mat, depth_mat, 0, 255, cv::NORM_MINMAX, CV_8U);
 
@@ -214,12 +176,12 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::Postprocess() {
     return std::make_pair(depth_mat, colormap);
 }
 
-// 异步
+
 void BaseDepthModel::PredictAsync(const cv::Mat & image) {
     std::vector<float> input = Preprocess(image);
     // 数据异步拷贝至 GPU
     CHECK_CUDA(cudaMemcpyAsync(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice, stream));
-// 异步推理
+
 #if NV_TENSORRT_MAJOR < 10
     context->enqueueV2(buffer, stream, nullptr);
 
@@ -234,7 +196,6 @@ void BaseDepthModel::PredictAsync(const cv::Mat & image) {
                               buffer_dst_colormap_dev, depth_infer_min_value, depth_infer_max_value, input_w, input_h,
                               origin_img_w, origin_img_h, stream);
 
-    // 3. 后处理：只拷贝数据，返回原始深度矩阵
     CHECK_CUDA(cudaMemcpyAsync(depth_output_data, buffer_dst_depth_dev, origin_img_h * origin_img_w * sizeof(uchar),
                     cudaMemcpyDeviceToHost, stream));
     CHECK_CUDA(cudaMemcpyAsync(depth_colormap_data, buffer_dst_colormap_dev, origin_img_h * origin_img_w * sizeof(uchar3),
@@ -246,19 +207,6 @@ void BaseDepthModel::WaitAsync() {
 }
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::GetPredictResultAsync() { 
-    // 验证原始 uchar 深度数据（非0即代表有深度信息）
-    std::cout << "[DEBUG] depth_output_data first 10 vals: ";
-    for(int i=0; i<10; ++i) std::cout << (int)depth_output_data[i] << " ";
-    std::cout << std::endl;
-
-    // 验证原始伪彩色数据（BGR格式）
-    std::cout << "[DEBUG] depth_colormap_data first 3 pixels (BGR): ";
-    for(int i=0; i<3; ++i) std::cout << "(" << (int)depth_colormap_data[i].z << "," 
-                                       << (int)depth_colormap_data[i].y << "," 
-                                       << (int)depth_colormap_data[i].x << ") ";
-    std::cout << std::endl;
-
-
     auto                        depth_output       = cv::Mat(origin_img_h, origin_img_w, CV_8UC1, depth_output_data);
     auto                        depth_colormap     = cv::Mat(origin_img_h, origin_img_w, CV_8UC3, depth_colormap_data);
     std::pair<cv::Mat, cv::Mat> result = std::make_pair(depth_output, depth_colormap);
