@@ -83,7 +83,7 @@ elseif(TARGET_PLATFORM STREQUAL "TX2")
 
 elseif(TARGET_PLATFORM STREQUAL "X86_64")
   # 按需增删架构
-  set(CUDA_ARCH "-gencode arch=compute_75,code=sm_75 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_120,code=sm_120")
+  set(CUDA_ARCH "-gencode arch=compute_120,code=sm_120")
   if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
     set(CMAKE_BUILD_PARALLEL_LEVEL 16)
   endif()
@@ -112,6 +112,7 @@ set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 --use_fast_math")
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
   message(STATUS "Embed_platform on - Jetson")
   include_directories(/usr/include/aarch64-linux-gnu)
+  include_directories(${PROJECT_SOURCE_DIR}/third_party/cub)
   link_directories(/usr/lib/aarch64-linux-gnu)
   
   # Jetson specific TensorRT path detection
@@ -136,32 +137,38 @@ include_directories(${CPP_SOURCE_DIR}/include)
 include_directories(${CPP_SOURCE_DIR}/bytetrack/include)
 file(GLOB_RECURSE BYTETRACK_SRCS ${CPP_SOURCE_DIR}/bytetrack/src/*.cpp)
 add_library(bytetrack SHARED ${BYTETRACK_SRCS})
-target_link_libraries(bytetrack cudart nvinfer ${OpenCV_LIBS})
+target_link_libraries(bytetrack ${OpenCV_LIBS})
 
-# ============= yolo lib =============
-include_directories(${CPP_SOURCE_DIR}/detect/include)
-file(GLOB_RECURSE YOLO_SRCS ${CPP_SOURCE_DIR}/detect/src/*.cpp ${CPP_SOURCE_DIR}/detect/src/*.cu)
-cuda_add_library(yolo_infer SHARED ${YOLO_SRCS})
+# =========== cuda operator library ===========
+include_directories(${CPP_SOURCE_DIR}/op_kernel/include)
+file(GLOB_RECURSE CUDA_KERNEL_SRCS ${CPP_SOURCE_DIR}/op_kernel/src/*.cu)
+cuda_add_library(op_kernel SHARED ${CUDA_KERNEL_SRCS})
 
 # Jetson specific optimizations
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
   # Add FP16 support option
-  target_compile_definitions(yolo_infer PRIVATE ENABLE_FP16=1)
+  target_compile_definitions(op_kernel PRIVATE ENABLE_FP16=1)
 endif()
 
-target_link_libraries(yolo_infer nvinfer cudart nvonnxparser ${OpenCV_LIBS})
+target_link_libraries(op_kernel cudart nvinfer nvonnxparser ${OpenCV_LIBS})
+
+# ============= yolo lib =============
+include_directories(${CPP_SOURCE_DIR}/detect/include)
+file(GLOB_RECURSE YOLO_SRCS ${CPP_SOURCE_DIR}/detect/src/*.cpp ${CPP_SOURCE_DIR}/detect/src/*.cu)
+add_library(yolo_infer SHARED ${YOLO_SRCS})
+target_link_libraries(yolo_infer op_kernel ${OpenCV_LIBS})
 
 # ============= depth lib =============
 include_directories(${CPP_SOURCE_DIR}/depth/include)
-file(GLOB_RECURSE DEPTH_SRCS ${CPP_SOURCE_DIR}/depth/src/*.cpp)
-add_library(depth SHARED ${DEPTH_SRCS})
-target_link_libraries(depth cudart nvinfer ${OpenCV_LIBS})
+file(GLOB_RECURSE DEPTH_SRCS ${CPP_SOURCE_DIR}/depth/src/*.cpp ${CPP_SOURCE_DIR}/depth/src/*.cu)
+cuda_add_library(depth SHARED ${DEPTH_SRCS})
+target_link_libraries(depth op_kernel cudart nvinfer ${OpenCV_LIBS})
 
 # ============= core lib =============
 include_directories(${CPP_SOURCE_DIR}/core/include)
 file(GLOB_RECURSE CORE_SRCS ${CPP_SOURCE_DIR}/core/src/*.cpp)
 add_library(core SHARED ${CORE_SRCS})
-target_link_libraries(core ${OpenCV_LIBS})
+target_link_libraries(core yolo_infer depth ${OpenCV_LIBS})
 
 # ============= tools lib =============
 include_directories(${CPP_SOURCE_DIR}/tools/include)
@@ -171,10 +178,8 @@ target_link_libraries(tools ${OpenCV_LIBS})
 
 # ======== main execute file ========
 find_package(yaml-cpp REQUIRED)
-include_directories(${CPP_SOURCE_DIR}/include)
-file(GLOB_RECURSE MAIN_SRCS ${CPP_SOURCE_DIR}/src/*.cpp)
-add_executable(main ${CPP_SOURCE_DIR}/main.cpp ${MAIN_SRCS})
-target_link_libraries(main bytetrack yolo_infer depth core tools yaml-cpp)
+add_executable(main ${CPP_SOURCE_DIR}/main.cpp)
+target_link_libraries(main bytetrack core tools yaml-cpp)
 
 # ==================== Google Benchmark ====================
 option(ENABLE_BENCHMARK "Build benchmark tests" ON)
@@ -187,11 +192,12 @@ if(ENABLE_BENCHMARK)
     target_link_libraries(pipeline_test PRIVATE 
         bytetrack yolo_infer depth core tools yaml-cpp benchmark::benchmark
     )
-
+else()
+  message(STATUS "ENABLE_BENCHMARK=OFF")
 endif()
 
 # ==================== pybind11 (Jetson 禁用) ====================
-option(ENABLE_PYBIND "Build python pybind module" ON)
+option(ENABLE_PYBIND "Build python pybind module" OFF)
 if(IS_JETSON)
   set(ENABLE_PYBIND OFF CACHE BOOL "Build python pybind module" FORCE)
 endif()
@@ -224,5 +230,5 @@ if(ENABLE_PYBIND)
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/python
   )
 else()
-  message(STATUS "ENABLE_PYBIND=OFF (Jetson platform)")
+  message(STATUS "ENABLE_PYBIND=OFF")
 endif()

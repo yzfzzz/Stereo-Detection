@@ -193,7 +193,7 @@ int DisplayManager::waitKey(int delay) {
 
 DrawingManager::DrawingManager(const std::vector<std::string> & class_names) : vClassNames_(class_names) {}
 
-void DrawingManager::drawTrackedObject(cv::Mat &                     img,
+void DrawingManager::drawTrackedObject(cv::Mat &               img,
                                        const STrack &                track,
                                        const MotionStateInfoRecord & motion_state,
                                        cv::Scalar                    color) {

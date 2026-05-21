@@ -1,9 +1,9 @@
 #pragma once
 
+#include "config_manager.h"
 #include "motion_state_engine.h"
 #include "STrack.h"
 
-#include "config_manager.h"
 #include <opencv2/core/types.hpp>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -52,7 +52,7 @@ class DisplayManager {
     cv::Size display_size_;
 
   public:
-    DisplayManager(ConfigManager & config,
+    DisplayManager(ConfigManager &     config,
                    const std::string & window_name  = "out_frame",
                    cv::Size            display_size = cv::Size(1280, 720 * 2));
     ~DisplayManager();

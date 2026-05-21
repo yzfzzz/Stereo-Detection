@@ -12,13 +12,21 @@ using namespace nvinfer1;
 class YoloDetector {
   public:
     YoloDetector(const std::string trtFile,
+                 int               raw_img_w,
+                 int               raw_img_h,
                  int               gpuId      = kGpuId,
                  float             nmsThresh  = kNmsThresh,
                  float             confThresh = kConfThresh,
                  int               numClass   = kNumClass);
     ~YoloDetector();
-    std::vector<Detection> inference(cv::Mat & img);
+    std::vector<Detection> inference(const cv::Mat & img);
+    void                   inferenceAsync(const cv::Mat & img);
+    std::vector<Detection> postProcess(float * outputData, const cv::Mat & img);
     static void            drawImage(cv::Mat & img, std::vector<Detection> & inferResult);
+
+    void WaitAsync();
+
+    std::vector<Detection> GetInferResultAsync(const cv::Mat & img);
 
   private:
     void get_engine();
@@ -41,6 +49,9 @@ class YoloDetector {
     std::vector<void *> vBufferD;
     float *             transposeDevice;
     float *             decodeDevice;
+    // preprocess
+    uchar *             srcDevData;
+    uchar *             midDevData;
 
     int  OUTPUT_CANDIDATES;           // 8400: 80 * 80 + 40 * 40 + 20 * 20
     int  yolo26_max_num_output_bbox;  // 暂时用于yolo26，后续可以删除
@@ -49,6 +60,8 @@ class YoloDetector {
 
     int input_h;
     int input_w;
+    int raw_img_h;
+    int raw_img_w;
 };
 
 #endif  // INFER_H

@@ -4,6 +4,7 @@
 #include "config.h"
 
 #include <cuda_runtime.h>
+#include <opencv2/core/hal/interface.h>
 
 #include <opencv2/opencv.hpp>
 
@@ -32,7 +33,7 @@ void decode(float *      src,
 
 void nms(float * data, float kNmsThresh, int maxObjects, int numBoxElement, cudaStream_t stream);
 
-__inline__ void scale_bbox(cv::Mat & img, float bbox[4], int input_w, int input_h) {
+__inline__ void scale_bbox(const cv::Mat & img, float bbox[4], int input_w, int input_h) {
     float r_w   = input_w / (img.cols * 1.0);
     float r_h   = input_h / (img.rows * 1.0);
     float r     = std::min(r_w, r_h);
@@ -44,5 +45,20 @@ __inline__ void scale_bbox(cv::Mat & img, float bbox[4], int input_w, int input_
     bbox[2] = (bbox[2] - pad_w) / r;
     bbox[3] = (bbox[3] - pad_h) / r;
 }
+
+void normalize_colormap_resize(float *      src,
+                               uchar *      norm_depth,
+                               uchar3 *     norm_colormap,
+                               uchar *      dst_depth,
+                               uchar3 *     dst_colormap,
+                               float *      d_cur_src_min_value,
+                               float *      d_cur_src_max_value,
+                               int          input_w,
+                               int          input_h,
+                               int          resized_w,
+                               int          resized_h,
+                               cudaStream_t stream);
+
+void initColorMapTable();  // init color map table
 
 #endif  // POSTPROCESS_H

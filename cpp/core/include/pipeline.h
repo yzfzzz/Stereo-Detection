@@ -1,32 +1,26 @@
 #pragma once
+#include "base.h"
 #include "BYTETracker.h"
 #include "config_manager.h"
-#include "depth_anything.h"
+#include "frame.h"
 #include "infer.h"
-#include "io_manager.h"
-#include "lite_mono.h"
 #include "motion_state_engine.h"
-#include "visual_manager.h"
-
-struct FrameResult {
-    std::vector<STrack>                            tracked_objects;
-    cv::Mat                                        result_depth;
-    cv::Mat                                        depth_vis;
-    std::unordered_map<int, MotionStateInfoRecord> motion_records;
-};
 
 class Pipeline {
   public:
-    Pipeline(ConfigManager config_manager);
+    Pipeline(ConfigManager config_manager, FrameMeta frame_meta);
 
     // 核心推理接口，供正常业务和 Benchmark 调用
-    void process(cv::Mat & img, int num_frames, FrameResult & out_result);
+    void process(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);
+    void processAsync(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);
 
     Scalar get_color(int idx) { return tracker_.get_color(idx); }
 
 
   private:
-    void initDepthModel();
+    void postProcess(FrameInputContext & frame_input_context,
+                     InferOutputContext & infer_output_context,
+                     const std::vector<Detection> &res);
 
     bool isTrackingClass(int class_id) {
         for (auto & c : trackClasses) {
