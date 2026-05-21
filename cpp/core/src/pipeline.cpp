@@ -62,8 +62,9 @@ void Pipeline::processAsync(FrameInputContext & frame_input_context, InferOutput
     depth_model_->WaitAsync();
     detector_.WaitAsync();
     if (do_depth) {
-        infer_output_context.result_depth = depth_model_->GetPredictResultAsync().first;
-        infer_output_context.depth_vis    = depth_model_->GetPredictResultAsync().second;
+        auto depth_result = depth_model_->GetPredictResultAsync();
+        infer_output_context.result_depth = depth_result.first;
+        infer_output_context.depth_vis    = depth_result.second;
     } else {
         infer_output_context.result_depth = cached_depth_;
         infer_output_context.depth_vis    = cached_depth_vis_;

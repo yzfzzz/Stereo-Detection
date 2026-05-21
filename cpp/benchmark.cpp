@@ -22,6 +22,18 @@ class PipelineBenchmark : public benchmark::Fixture {
         frame_meta = FrameMeta(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT), cap.get(CAP_PROP_FPS),
                                FrameSource::VIDEO);
         pipeline   = std::make_unique<Pipeline>(config_manager, frame_meta);
+
+        // Warmup: 跑 5 帧让 GPU 预热
+        for (int i = 0; i < 20; ++i) {
+            FrameInputContext  warmup_ctx(i, frame_meta);
+            InferOutputContext warmup_out;
+            if (cap.read(warmup_ctx.raw_img) && !warmup_ctx.raw_img.empty()) {
+                pipeline->process(warmup_ctx, warmup_out);
+            }
+        }
+        // Warmup 后重置视频到开头
+        cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+        num_frames = 0;
     }
 
     virtual void TearDown(benchmark::State & state) override {
@@ -61,7 +73,5 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessAsyncInference)(benchmark::State & 
 }
 
 BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond);
-
-
 BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond);
 BENCHMARK_MAIN();
