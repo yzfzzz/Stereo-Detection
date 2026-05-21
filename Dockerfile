@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     gdb \
     git \
+    libbenchmark-dev \
+    libbenchmark-tools \
     # Ultralytics 依赖的系统库（常用于 OpenCV 显示和视频编解码）
     libgl1 \
     libglib2.0-0 \
