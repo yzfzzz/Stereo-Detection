@@ -112,6 +112,8 @@ set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 --use_fast_math")
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
   message(STATUS "Embed_platform on - Jetson")
   include_directories(/usr/include/aarch64-linux-gnu)
+  include_directories(/usr/local/cuda-10.2/targets/aarch64-linux/include/thrust/system/cuda/detail)
+
   link_directories(/usr/lib/aarch64-linux-gnu)
   
   # Jetson specific TensorRT path detection
