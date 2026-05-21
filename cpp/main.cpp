@@ -89,7 +89,8 @@ int run(char * video_path) {
         }
         // 执行推理流水线
         std::string name = "Infer Pipeline";
-        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF(name, pipeline, process, frame_input_context, infer_output_context);
+        // DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF(name, pipeline, process, frame_input_context, infer_output_context);
+        DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF(name, pipeline, processAsync, frame_input_context, infer_output_context);
         total_us += ScopedTimer::GetScopedTimers()[name].back();  // 获取刚刚这次推理的耗时
 #else
         if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {

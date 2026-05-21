@@ -306,13 +306,19 @@ void YoloDetector::inferenceAsync(const cv::Mat & img) {
 
     preprocess(img, (float *) vBufferD[0], srcDevData, midDevData, raw_img_h, raw_img_w, input_h, input_w, stream);
 
+#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+    // For Jetson Nano (ARM64) and older TensorRT versions
+    void * bindings[] = { vBufferD[0], vBufferD[1] };
+    bool   status     = context->enqueueV2(bindings, stream, nullptr);
+#else
     // For newer TensorRT versions on x86_64
     context->setTensorAddress("images", vBufferD[0]);
     context->setTensorAddress("output0", vBufferD[1]);
     bool status = context->enqueueV3(stream);
+#endif
 
     if (!status) {
-        std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
+        std::cerr << "TensorRT enqueue failed!" << std::endl;
         return;
     }
 

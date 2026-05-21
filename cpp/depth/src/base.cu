@@ -182,12 +182,17 @@ void BaseDepthModel::PredictAsync(const cv::Mat & image) {
     // 数据异步拷贝至 GPU
     CHECK_CUDA(cudaMemcpyAsync(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice, stream));
 
-#if NV_TENSORRT_MAJOR < 10
-    context->enqueueV2(buffer, stream, nullptr);
+#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+    // For Jetson Nano (ARM64) and older TensorRT versions
+    bool status = context->enqueueV2(buffer, stream, nullptr);
 
 #else
-    context->enqueueV3(stream);
+    bool status  = context->enqueueV3(stream);
 #endif
+    if (!status) {
+        std::cerr << "TensorRT enqueue failed!" << std::endl;
+        return;
+    }
 
     cub::DeviceReduce::Min(cub_mid_min, cub_bytes, (float*)buffer[1], depth_infer_min_value, input_h * input_w, stream);
     cub::DeviceReduce::Max(cub_mid_max, cub_bytes, (float*)buffer[1], depth_infer_max_value, input_h * input_w, stream);
