@@ -45,5 +45,23 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessInference)(benchmark::State & state
     state.SetItemsProcessed(state.iterations());
 }
 
+BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessAsyncInference)(benchmark::State & state) {
+    for (auto _ : state) {
+        FrameInputContext frame_input_context(num_frames, frame_meta);
+        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
+            cap.set(cv::CAP_PROP_POS_FRAMES, 0);  // 视频播完自动重头
+            continue;
+        }
+        num_frames++;
+
+        InferOutputContext infer_output_context;
+        pipeline->processAsync(frame_input_context, infer_output_context);
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond);
+
+
 BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond);
 BENCHMARK_MAIN();
