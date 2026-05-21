@@ -31,7 +31,7 @@ YoloDetector::YoloDetector(const std::string trtFile,
     gLogger = Logger(ILogger::Severity::kERROR);
     cudaSetDevice(gpuId);
 
-    CHECK(cudaStreamCreate(&stream));
+    CHECK_CUDA(cudaStreamCreate(&stream));
 
     // load engine
     get_engine();
@@ -79,14 +79,14 @@ YoloDetector::YoloDetector(const std::string trtFile,
     }
     // prepare input and output space on device
     vBufferD.resize(2, nullptr);
-    CHECK(cudaMalloc(&vBufferD[0], 3 * input_h * input_w * sizeof(float)));
-    CHECK(cudaMalloc(&vBufferD[1], outputSize * sizeof(float)));
+    CHECK_CUDA(cudaMalloc(&vBufferD[0], 3 * input_h * input_w * sizeof(float)));
+    CHECK_CUDA(cudaMalloc(&vBufferD[1], outputSize * sizeof(float)));
 
-    CHECK(cudaMalloc(&transposeDevice, outputSize * sizeof(float)));
-    CHECK(cudaMalloc(&decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float)));
+    CHECK_CUDA(cudaMalloc(&transposeDevice, outputSize * sizeof(float)));
+    CHECK_CUDA(cudaMalloc(&decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float)));
 
-    CHECK(cudaMalloc((void **) &srcDevData, sizeof(uchar) * raw_img_h * raw_img_w * 3));
-    CHECK(cudaMalloc((void **) &midDevData, sizeof(uchar) * input_h * input_w * 3));
+    CHECK_CUDA(cudaMalloc((void **) &srcDevData, sizeof(uchar) * raw_img_h * raw_img_w * 3));
+    CHECK_CUDA(cudaMalloc((void **) &midDevData, sizeof(uchar) * input_h * input_w * 3));
 }
 
 void YoloDetector::get_engine() {
@@ -202,13 +202,13 @@ YoloDetector::~YoloDetector() {
     cudaStreamDestroy(stream);
 
     for (int i = 0; i < 2; ++i) {
-        CHECK(cudaFree(vBufferD[i]));
+        CHECK_CUDA(cudaFree(vBufferD[i]));
     }
 
-    CHECK(cudaFree(transposeDevice));
-    CHECK(cudaFree(decodeDevice));
-    CHECK(cudaFree(srcDevData));
-    CHECK(cudaFree(midDevData));
+    CHECK_CUDA(cudaFree(transposeDevice));
+    CHECK_CUDA(cudaFree(decodeDevice));
+    CHECK_CUDA(cudaFree(srcDevData));
+    CHECK_CUDA(cudaFree(midDevData));
 
     delete[] outputData;
 
@@ -255,9 +255,9 @@ std::vector<Detection> YoloDetector::inference(const cv::Mat & img) {
     if (!is_need_nms_) {
         // 走yolo26推理，输出候选框较少，且已经经过nms处理，不需要再做一次nms了
         // [1 1801]
-        CHECK(cudaMemcpyAsync(outputData, vBufferD[1],
-                              (yolo26_max_num_output_bbox * yolo26_num_box_element) * sizeof(float),
-                              cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaMemcpyAsync(outputData, vBufferD[1],
+                                   (yolo26_max_num_output_bbox * yolo26_num_box_element) * sizeof(float),
+                                   cudaMemcpyDeviceToHost, stream));
         cudaStreamSynchronize(stream);
     } else {
         // 走yolo8推理，输出候选框较多，需要做一次nms处理
@@ -278,8 +278,8 @@ std::vector<Detection> YoloDetector::inference(const cv::Mat & img) {
         nms(decodeDevice, nmsThresh_, kMaxNumOutputBbox, kNumBoxElement, stream);
 #endif
 
-        CHECK(cudaMemcpyAsync(outputData, decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float),
-                              cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaMemcpyAsync(outputData, decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float),
+                                   cudaMemcpyDeviceToHost, stream));
         cudaStreamSynchronize(stream);
     }
 
@@ -325,52 +325,31 @@ std::vector<Detection> YoloDetector::postProcess(float * outputData, const cv::M
     return vDetections;
 }
 
-std::vector<Detection> YoloDetector::inferenceAsync(const cv::Mat & img) {
+void YoloDetector::inferenceAsync(const cv::Mat & img) {
     if (img.empty()) {
-        return {};
+        return;
     }
 
-    // put input on device, then letterbox、bgr to rgb、hwc to chw、normalize.
-#if defined(ENABLE_TIMER)
-
-    DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-1.Yolo Preprocess", preprocess, img, (float *) vBufferD[0], srcDevData,
-                                     midDevData, raw_img_h, raw_img_w, input_h, input_w, stream);
-#else
     preprocess(img, (float *) vBufferD[0], srcDevData, midDevData, raw_img_h, raw_img_w, input_h, input_w, stream);
 
-#endif
-
-    // TensorRT inference - use appropriate API based on platform/TensorRT version
-#if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
-    // For Jetson Nano (ARM64) and older TensorRT versions
-    bool status = context->enqueueV2({ vBufferD[0], vBufferD[1] }, stream, nullptr);
-#else
     // For newer TensorRT versions on x86_64
     context->setTensorAddress("images", vBufferD[0]);
     context->setTensorAddress("output0", vBufferD[1]);
     bool status = context->enqueueV3(stream);
-#endif
+
     if (!status) {
         std::cerr << "TensorRT enqueueV3 failed!" << std::endl;
-        return {};
+        return;
     }
 
     if (!is_need_nms_) {
         // 走yolo26推理，输出候选框较少，且已经经过nms处理，不需要再做一次nms了
         // [1 1801]
-        CHECK(cudaMemcpyAsync(outputData, vBufferD[1],
-                              (yolo26_max_num_output_bbox * yolo26_num_box_element) * sizeof(float),
-                              cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaMemcpyAsync(outputData, vBufferD[1],
+                                   (yolo26_max_num_output_bbox * yolo26_num_box_element) * sizeof(float),
+                                   cudaMemcpyDeviceToHost, stream));
     } else {
-        // 走yolo8推理，输出候选框较多，需要做一次nms处理
-#if defined(ENABLE_TIMER)
-        DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-3.Yolo Transpose", transpose, (float *) vBufferD[1], transposeDevice,
-                                         OUTPUT_CANDIDATES, numClass_ + 4, stream);
-        DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-4.Yolo Decode", decode, transposeDevice, decodeDevice, OUTPUT_CANDIDATES,
-                                         numClass_, confThresh_, kMaxNumOutputBbox, kNumBoxElement, stream);
-        DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-5.Yolo NMS", nms, decodeDevice, nmsThresh_, kMaxNumOutputBbox,
-                                         kNumBoxElement, stream);
-#else
+        // 走yolo8推理，输出候选框较多，需要做一次nms处
         // transpose [1 84 8400] convert to [1 8400 84]
         transpose((float *) vBufferD[1], transposeDevice, OUTPUT_CANDIDATES, numClass_ + 4, stream);
         // convert [1 8400 84] to [1 7001]
@@ -378,19 +357,17 @@ std::vector<Detection> YoloDetector::inferenceAsync(const cv::Mat & img) {
                kNumBoxElement, stream);
         // cuda nms
         nms(decodeDevice, nmsThresh_, kMaxNumOutputBbox, kNumBoxElement, stream);
-#endif
 
-        CHECK(cudaMemcpyAsync(outputData, decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float),
-                              cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaMemcpyAsync(outputData, decodeDevice, (1 + kMaxNumOutputBbox * kNumBoxElement) * sizeof(float),
+                                   cudaMemcpyDeviceToHost, stream));
     }
-#if defined(ENABLE_TIMER)
+}
 
-    DEBUG_FUNCTION_RUNNING_TIME_FUNC("2-6.Yolo Sync", cudaStreamSynchronize, stream);
-#else
+void YoloDetector::WaitAsync() {
     cudaStreamSynchronize(stream);
+}
 
-#endif
-
+std::vector<Detection> YoloDetector::GetInferResultAsync(const cv::Mat & img) {
     return postProcess(outputData, img);
 }
 

@@ -20,9 +20,13 @@ class YoloDetector {
                  int               numClass   = kNumClass);
     ~YoloDetector();
     std::vector<Detection> inference(const cv::Mat & img);
-    std::vector<Detection> inferenceAsync(const cv::Mat & img);
+    void                   inferenceAsync(const cv::Mat & img);
     std::vector<Detection> postProcess(float * outputData, const cv::Mat & img);
     static void            drawImage(cv::Mat & img, std::vector<Detection> & inferResult);
+
+    void WaitAsync();
+
+    std::vector<Detection> GetInferResultAsync(const cv::Mat & img);
 
   private:
     void get_engine();
