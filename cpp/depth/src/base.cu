@@ -149,8 +149,13 @@ void BaseDepthModel::Init(const std::string & engine_path, int img_w, int img_h)
     depth_output_data   = new uchar[origin_img_h * origin_img_w];
     depth_colormap_data = new uchar3[origin_img_h * origin_img_w];
 
-    context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
-    context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
+    #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
+        // TRT 8.x: 不需要显式 setTensorAddress，enqueueV2 会按 binding 顺序读取 buffer 数组
+    #else
+        // TRT 10.x: 必须显式设置 Tensor 地址
+        context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
+        context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
+    #endif
 
     initColorMapTable();
 }
