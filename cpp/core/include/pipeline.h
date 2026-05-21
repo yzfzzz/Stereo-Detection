@@ -12,12 +12,12 @@ class Pipeline {
 
     // 核心推理接口，供正常业务和 Benchmark 调用
     void process(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);
+    void processAsync(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);
 
     Scalar get_color(int idx) { return tracker_.get_color(idx); }
 
 
   private:
-    void initDepthModel();
 
     bool isTrackingClass(int class_id) {
         for (auto & c : trackClasses) {
