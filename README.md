@@ -1,78 +1,185 @@
-<img src="https://yzfzzz.oss-cn-shenzhen.aliyuncs.com/image/dafafa.drawio%20(5)%20(1).png" alt="dafafa.drawio (5) (1)" style="zoom:80%;" />
+# Stereo-Detection — C++ / TensorRT 实时目标检测 + 深度融合框架
 
-## 项目日志
+本项目是一个基于 C++ 与 TensorRT 的高性能视觉推理框架，融合 **YOLO** 目标检测与 **单目/双目深度估计（Depth-Anything / Lite-Mono）**，并在检测结果上叠加基于卡尔曼滤波的运动状态（速度 / 加速度 / 距离变化）估计。框架兼顾高端 GPU（x86）与嵌入式（aarch64，Jetson）平台，提供同步与异步两种推理流水线以适配不同的延迟/吞吐取舍。
+![产品图](./doc/product.png)
+**快速亮点**
+- 多模型并行（Depth + Detection）流水线（Sync / Async）
+- GPU 端尽可能的前/后处理并行（Resize、Normalize、NMS 在 GPU 上）
+- 基于 BYTETracker 的多目标跟踪 + 卡尔曼滤波运动平滑
+- CMake 平台嗅探（自动为 Jetson / x86 选择优化编译参数）
 
-- [x] 双目相机的标定和初始化（2022.7.3）
-- [x] 运行BM、SGBM算法（2022.7.6）
-- [x] 研究SGBM算法并得出良好的open3d模型（2022.7.15）
-- [x] 实现双目测距（2022.7.27）
-- [x] 双目相机测出Yolov5检测物体的距离（2022.7.29）
-- [x] 视频帧率提高至6FPS（2022.7.30）
-- [x] 使用C++重勾BM算法（2022.8.1）
-- [x] 使用C++重构SGBM算法（2022.8.1）
-- [x] 使用TensorRT、C++部署yolov5模型（2022.8.3）
-- [x] 完成项目，帧率至少达到20FPS（2022.8.3）
-- [x] 新增`Jeston nano`部署文件
+---
 
+## 目录 (Table of Contents)
+- [技术栈](#技术栈)
+- [快速上手](#快速上手)
+- [整体架构与图解](#整体架构与图解)
+- [关键模块说明（逐层）](#关键模块说明逐层)
+- [配置项与示例 (`cpp/bin/config.yaml`)](#配置项与示例-cppbincconfigyaml)
+- [构建与运行](#构建与运行)
+- [测试与基准（Benchmark）](#测试与基准benchmark)
+- [平台差异化调优（Jetson / x86）](#平台差异化调优jetson--x86)
+- [常见问题与排查](#常见问题与排查)
+- [开发与贡献](#开发与贡献)
 
+---
 
-## 环境说明
+## 技术栈
 
-- 🔥Tensorrt 8.4
-- 🚀Cuda 11.6.1 Cudnn 8.4.1
-- Opencv 4.5.1
-- Cmake 3.23.3
-- Visual Studio 2017
-- MX350，Windows10
+- 语言：C++14
+- 构建：CMake 3.10+
+- 推理后端：TensorRT（兼容 8.x / 10.x）
+- 并行/加速：CUDA、cuBLAS、cuDNN、CUB
+- 视觉处理：OpenCV 4.x
+- 配置：yaml-cpp
+- 基准测试：Google Benchmark
+- 算法：Yolo，DepthAnything，LiteMono，BYTETracker
 
+---
 
+## 快速上手
 
-## 文件说明
+1. 克隆仓库：
 
-- 💼**BM、SGBM**算法均有C++和Python两个版本
+```bash
+git clone https://github.com/your-username/Stereo-Detection.git
+cd Stereo-Detection
+```
 
-- 📂**tensorrt**：模型部署文件，帧率为23fps
+2. 初始化子模块（若需要）：
 
-- 📁**yolov5-v6.1-pytorch-master**：未部署前的python代码文件，帧率为5fps
+```bash
+./env.sh
+```
 
-- **stereo_introduce**：双目摄像头基本资料
+3. 准备模型：
 
-- 📒**双目视觉资料**：从双目相机的标定（Matlab）到sgbm生成深度图的图文教程
+- 将 ONNX 或已转换的 `.engine` 放到 `model/engine/`。常见路径示例：
 
-- **stereo_shot.py**：摄像头拍摄代码
-
-- 🎁**Jeston nano_tensorrt**：Jeston nano(Linux)部署资料
-
-  
-
-## 怎么用？
-
-### 双目相机的标定：https://www.bilibili.com/video/BV1GP41157Ti
-
-### SGBM算法应用(Python版)：https://www.bilibili.com/video/BV1zT411w7oZ
-
-### 在YOLOv5中加入双目测距，实现目标测距：https://www.bilibili.com/video/BV1qG41147ZW
-
-### Jeston nano部署yolov5，并实现双目测距：https://www.bilibili.com/video/BV15g411Q7ZV
-
-## 参考资料
-
-1. 🍔YOLOv5 Tensorrt Python/C++部署：https://www.bilibili.com/video/BV113411J7nk/?spm_id_from=333.788.recommend_more_video.-1&vd_source=97aec9e652524c83bb4f4b9481ee059e
-2. 🍞Pytorch 搭建自己的YoloV5目标检测平台Bubbliiiing：https://www.bilibili.com/video/BV1FZ4y1m777?spm_id_from=333.999.0.0
-3. 🍟双目摄像头-立体视觉：https://blog.csdn.net/qq_41204464/category_10766478.html?spm=1001.2014.3001.5482)
-4. CUDA的正确安装/升级/重装/使用方式：https://zhuanlan.zhihu.com/p/520536351
-5. 报错【Could not locate zlibwapi.dll. Please make sure it is in your library path】：https://blog.csdn.net/qq_44224801/article/details/125525721
-6. 🍿windows下 C++ openCV配置及x86编译(傻瓜式教程)：https://blog.csdn.net/qq_37059136/article/details/124165080
-7. 树莓派安装pytorch：https://blog.csdn.net/weixin_53798505/article/details/125235377
-8. 树莓派开机自启动：https://blog.csdn.net/TohkaQAQ/article/details/121056564
+```
+model/engine/
+  ├─ yolov8s_s640_ws1024_fp16.engine
+  └─ lite_mono-8m_op12_s640_ws-all_fp16.engine
+```
 
 
 
+4. 构建项目：
+
+```bash
+mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
+```
+
+5. 运行主程序（示例）：
+
+```bash
+cd ../bin
+./main ../data/shu/1shu_east_0514.mp4
+```
+
+程序会在 GUI（若启用）显示融合后的检测、深度、运动指示；同时终端打印帧率/耗时信息。
+
+---
+
+## 整体架构与图解
+
+![产品图](./doc/arch.png)
+下图为本框架的分层视角（图中标注 1~5 层）：
+
+1. 数据接入层（Data Ingest）
+2. 核心调度层（Pipeline / Task Scheduler）
+3. 算法推理层（Depth 分支、Detection 分支、Tracker）
+4. 状态与交互层（MotionState/Display/IO）
+5. 基础设施层（TensorRT / CUDA / CUB）
+
+该图以数据流为主轴（实线），并用虚线表示配置/依赖。。
+
+---
+
+## 构建与运行（详尽步骤）
+
+### 依赖安装（Ubuntu / Jetson）
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake git libyaml-cpp-dev libopencv-dev libbenchmark-dev
+# Jetson 需安装对应的 TensorRT SDK 与 CUDA（通常系统自带或通过 NVIDIA JetPack 安装）
+```
+
+### 编译（示例）
+
+```bash
+mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
+```
+
+### 运行主程序
+
+```bash
+cd ../bin
+# 使用 video 文件
+./main ../data/shu/1shu_east_0514.mp4
+# 或使用摄像头（0 为设备号）
+./main 0
+```
+
+### 运行基准测试
+
+```bash
+cd ./bin
+./pipeline_test
+```
+
+注意：若遇到 Google Benchmark 输出 `Library was built as DEBUG` 警告，可自行从源码编译 `benchmark` 为 `Release`。
+
+---
+
+## 测试与基准（Benchmark）
+
+项目集成 Google Benchmark 用于测量不同执行策略的吞吐/延迟。常见结论：
+
+```bash
+cd ./bin
+./test_pipeline
+./test_depth_preprocess
+```
+### 同步改异步，流水线并行
+
+| 指标 | NV5060 同步 | NV5060 异步 | NV5060 改进 | TX2 同步 | TX2 异步 | TX2 改进 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Wall Time (ms/帧) | 10.7 | 9.80 | -8.4% ↓ | 159 | 150 | -5.7% ↓ |
+| CPU Time (ms) | 10.7 | 9.64 | -9.9% ↓ | 43 | 35 | -18.6% ↓ |
+| 吞吐量 | 93.33 | 103.79 | +11.2% ↑ | 23.38 | 28.75 | +23.0% ↑ |
+| 迭代次数 | 66 | 72 | +6 ↑ | 16 | 20 | +4 ↑ |
+
+### 深度模型前处理 cpu 改 cuda
+
+| 平台 | 处理方式 | 平均耗时 | 吞吐量 | GPU相对CPU的性能提升倍数 |
+| :--- | :--- | :--- | :--- | :--- |
+| Jetson TX2 | CPU预处理 (含Copy) | 13 ms | 76.75 items/s | 约 9.1 倍 |
+| Jetson TX2 | GPU深度图预处理 | 2 ms | 696.23 items/s | - |
+| NV5060 | CPU预处理 (含Copy) | 2.71 ms | 356.30 items/s | 约 7.6 倍 |
+| NV5060 | GPU深度图预处理 | 0.355 ms | 2709.07 items/s | - |
 
 
 
 
+## 开发与贡献
+
+- 若提交补丁，请先在 `cpp` 下运行 `make` 与 `./pipeline_test`，确保基准与编译通过。
+- 提交 PR 前请运行 clang-format（若项目中有格式化配置）。
+
+---
+
+## 许可证
+
+见仓库根目录 `LICENSE`。
+
+---
 
 
 
-
+*Generated by Stereo-Detection Dev Team*
