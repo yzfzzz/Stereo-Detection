@@ -39,6 +39,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: stereo-build
-          path: build/bin/
+          path: bin/
           retention-days: 1
       
