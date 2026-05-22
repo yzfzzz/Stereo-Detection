@@ -49,7 +49,7 @@ cd Stereo-Detection
 2. 初始化子模块（若需要）：
 
 ```bash
-git submodule update --init --recursive
+./env.sh
 ```
 
 3. 准备模型：
@@ -67,7 +67,6 @@ model/engine/
 4. 构建项目：
 
 ```bash
-cd cpp
 mkdir -p build && cd build
 cmake ..
 make -j$(nproc)
@@ -77,7 +76,7 @@ make -j$(nproc)
 
 ```bash
 cd ../bin
-./main ../../data/shu/1shu_east_0514.mp4
+./main ../data/shu/1shu_east_0514.mp4
 ```
 
 程序会在 GUI（若启用）显示融合后的检测、深度、运动指示；同时终端打印帧率/耗时信息。
@@ -95,68 +94,7 @@ cd ../bin
 4. 状态与交互层（MotionState/Display/IO）
 5. 基础设施层（TensorRT / CUDA / CUB）
 
-该图以数据流为主轴（实线），并用虚线表示配置/依赖。下面在“关键模块说明（逐层）”中基于图逐步解释。
-
----
-
-## 关键模块说明（逐层）
-
-以下按图中层级从上到下说明模块职责与关键文件位置：
-
-### 1) 数据接入层（Data Ingest）
-
-- 功能：从摄像头/视频/RTSP/文件读取帧、封装时间戳与元数据。
-- 关键类型：`FrameInputContext`（封装 `frame_id`、时间戳、原始 `cv::Mat`）。
-- 关联代码：`cpp/main.cpp`（入口）、`cpp/tools/`（IO 相关）。
-
-设计要点：时间戳精度对卡尔曼滤波/速度估计非常关键，务必使用高精度计时并传递 `dt`。
-
-### 2) 核心调度层（Pipeline）
-
-- 功能：接收 `FrameInputContext` 后负责调度 Depth 与 Detection 推理（两种模式：同步串行 / 异步帧内并行），并组织后续流程（Tracker、MotionState、Draw）。
-- 主要文件：`cpp/core/pipeline.h`、`cpp/core/pipeline.cpp`。
-- 两种执行策略：
-  - 同步（`process`）: 保证每帧完成所有推理再返回（延迟更可控，适实时低延迟）。
-  - 异步（`processAsync`）: 在一个帧周期内将 Depth 与 YOLO 投递到不同 `cudaStream`，以提升吞吐（适批量处理或高端 GPU）。
-
-注意：项目中存在“帧内并发”（在同一帧同时投递多个模型）与“跨帧流水线”（真正的 pipelining，将不同帧分阶段重叠）概念区别。对实时低延迟场景，推荐使用同步模式；对吞吐优先场景，启用异步或进一步实现跨帧流水线。
-
-### 3) 算法推理层（Depth / Detection / Tracker）
-
-- Depth 分支：`cpp/depth/` 下封装 `BaseDepthModel`（接口），支持 `Depth-Anything` 与 `LiteMono` 等实现。产生整图深度图或 ROI 深度。
-- Detection 分支：`cpp/detect/` 下封装 `YoloDetector`，负责前处理（GPU resize/normalize）、推理（TensorRT `enqueue` / `enqueueV3`）与后处理（GPU NMS）。
-- Tracker：`cpp/bytetrack/` 集成 BYTETracker，实现 target ID 持久化、丢失/重连策略。
-
-GPU 优化点：尽量让前处理、推理与后处理在 GPU 上完成，减少 D2H/H2D 复制；使用流（streams）并重用 TensorRT 上下文/缓冲区。
-
-### 4) 状态与交互层（MotionState / Drawing / Display）
-
-- MotionStateEngine：位于 `cpp/core/`，使用 `cv::KalmanFilter` 做二阶运动估计（位置/速度/加速度）。输入为由 Tracker 提供的 `track_id` + ROI 深度样本。
-- DrawingManager / DisplayManager：负责渲染（框、深度热图、速度箭头、文本）与窗口管理。可选关闭 GUI（用于 headless 环境）。
-
-### 5) 基础设施层（TensorRT / CUDA / CUB）
-
-- TensorRT：负责序列化/反序列化模型（`.engine`），上下文/流调度。
-- CUDA / cuBLAS / cuDNN：用于加速核心算子与网络推理。
-- CUB：用于高性能并行算法（scan/reduce/sort），部分 GPU NMS 或前处理会调用。
-
----
-
-## 配置项与示例
-
-项目在 `bin/config.yaml` 中集中管理运行时参数（无需重编译即可调整）。常用字段示例：
-
-| 键名 | 说明 | 示例 |
-|---|---:|---|
-| `display_manager.is_display` | 是否启用 GUI 窗口 | `true` / `false` |
-| `yolo.yolo_engine` | YOLO engine/onnx 路径 | `model/engine/yolov8s.engine` |
-| `yolo.conf_thresh` | 目标置信度阈值 | `0.25` |
-| `yolo.nms_thresh` | NMS IOU 阈值 | `0.45` |
-| `depth.depth_engine` | 深度模型 engine 路径 | `model/engine/lite_mono.engine` |
-| `depth.depth_interval` | 抽帧深度估计间隔（2=隔帧） | `1` |
-| `motion_state_engine.velocity_threshold` | 判定趋近/远离速度阈值（单位根据配置） | `20` |
-
-调参建议：在 Jetson 上适当增加 `depth_interval`（比如 2 或 3）以降低推理压力；在 x86 上可设置 `depth_interval=1` 做高频深度估计。
+该图以数据流为主轴（实线），并用虚线表示配置/依赖。。
 
 ---
 
@@ -203,10 +141,28 @@ cd ./bin
 
 项目集成 Google Benchmark 用于测量不同执行策略的吞吐/延迟。常见结论：
 
-- 高端 GPU（如 RTX 5060）：异步/多流通常能带来可观吞吐提升（Multi-Stream 自动优化）。
-- 边缘设备（Jetson TX2/Nano）：由于受限于寄存器 / L2 / 带宽，帧内异步若在 host 阻塞（`cudaStreamSynchronize`）情况下未必带来延迟优势；实时低延迟场景推荐使用同步模式。
+```bash
+cd ./bin
+./test_pipeline
+./test_depth_preprocess
+```
+### 同步改异步，流水线并行
 
-基准注意点：确保在注册 benchmark 的测试中加入 warmup（若干次空跑）以避免首帧 TensorRT 构建或显存分配带来的冷启动影响。
+| 指标 | NV5060 同步 | NV5060 异步 | NV5060 改进 | TX2 同步 | TX2 异步 | TX2 改进 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Wall Time (ms/帧) | 10.7 | 9.80 | -8.4% ↓ | 159 | 150 | -5.7% ↓ |
+| CPU Time (ms) | 10.7 | 9.64 | -9.9% ↓ | 43 | 35 | -18.6% ↓ |
+| 吞吐量 | 93.33 | 103.79 | +11.2% ↑ | 23.38 | 28.75 | +23.0% ↑ |
+| 迭代次数 | 66 | 72 | +6 ↑ | 16 | 20 | +4 ↑ |
+
+### 深度模型前处理 cpu 改 cuda
+
+| 平台 | 处理方式 | 平均耗时 | 吞吐量 | GPU相对CPU的性能提升倍数 |
+| :--- | :--- | :--- | :--- | :--- |
+| Jetson TX2 | CPU预处理 (含Copy) | 13 ms | 76.75 items/s | 约 9.1 倍 |
+| Jetson TX2 | GPU深度图预处理 | 2 ms | 696.23 items/s | - |
+| NV5060 | CPU预处理 (含Copy) | 2.71 ms | 356.30 items/s | 约 7.6 倍 |
+| NV5060 | GPU深度图预处理 | 0.355 ms | 2709.07 items/s | - |
 
 
 
