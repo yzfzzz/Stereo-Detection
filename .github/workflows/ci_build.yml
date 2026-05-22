@@ -1,0 +1,44 @@
+name: 🚀 CI - Compile Check
+
+on:
+  push:
+    branches: [ main, develop, V2.*, V1.*, feat/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  compile:
+    name: 🔨 Compile Check
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+      
+      - name: Build
+        run: |
+          cd build
+          make -j$(nproc)
+          echo "✅ Compilation successful"
+      
+      - name: List build artifacts
+        run: |
+          echo "📦 Build artifacts:"
+          ls -lh bin/ 2>/dev/null || echo "bin/ directory not found"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: depth-detect-build
+          path: bin/
+          retention-days: 1
+      
