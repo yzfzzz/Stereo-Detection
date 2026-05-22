@@ -22,4 +22,14 @@ dstHeight:  CNN input height
 dstWidth:   CNN input width
 */
 
+void depthPreprocess(uchar*      src,
+                    float*      dst,
+                    int         input_w,
+                    int         input_h,
+                    int         resized_w,
+                    int         resized_h,
+                    float*      mean,
+                    float*      std,
+                    cudaStream_t stream);
+
 #endif  // PREPROCESS_H

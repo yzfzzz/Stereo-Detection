@@ -96,7 +96,7 @@ int run(char * video_path) {
         if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
             break;
         }
-        pipeline.process(frame_input_context, infer_output_context);
+        pipeline.processAsync(frame_input_context, infer_output_context);
 
 #endif
         num_frames++;
