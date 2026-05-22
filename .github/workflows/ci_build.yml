@@ -38,7 +38,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: stereo-build
+          name: depth-detect-build
           path: bin/
           retention-days: 1
       
