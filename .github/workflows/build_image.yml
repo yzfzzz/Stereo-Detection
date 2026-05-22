@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'Dockerfile'
-      - '.github/workflows/build-image.yml'
+      - '.github/workflows/build_image.yml'
     branches: [ main, develop, V2.*, V1.*, feat/* ]
   workflow_dispatch:  # 手动触发
 
