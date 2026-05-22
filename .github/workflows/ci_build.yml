@@ -34,3 +34,11 @@ jobs:
         run: |
           echo "📦 Build artifacts:"
           ls -lh bin/ 2>/dev/null || echo "bin/ directory not found"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stereo-build
+          path: build/bin/
+          retention-days: 1
+      
