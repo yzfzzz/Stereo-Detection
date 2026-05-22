@@ -72,6 +72,7 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessAsyncInference)(benchmark::State & 
     state.SetItemsProcessed(state.iterations());
 }
 
-BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond);
-BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond)->Iterations(100);
+;
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond)->Iterations(100);
 BENCHMARK_MAIN();

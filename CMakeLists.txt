@@ -179,19 +179,29 @@ target_link_libraries(tools ${OpenCV_LIBS})
 # ======== main execute file ========
 find_package(yaml-cpp REQUIRED)
 add_executable(main ${CPP_SOURCE_DIR}/main.cpp)
-target_link_libraries(main bytetrack core tools yaml-cpp)
+target_link_libraries(main core bytetrack tools yaml-cpp)
 
 # ==================== Google Benchmark ====================
 option(ENABLE_BENCHMARK "Build benchmark tests" ON)
 
 if(ENABLE_BENCHMARK)
     message(STATUS "Building benchmark tests")
-    # 查找 Google benchmark
+    # find Google benchmark
     find_package(benchmark REQUIRED)
-    add_executable(pipeline_test ${CPP_SOURCE_DIR}/benchmark.cpp ${MAIN_SRCS})
-    target_link_libraries(pipeline_test PRIVATE 
-        bytetrack yolo_infer depth core tools yaml-cpp benchmark::benchmark
+    set(BENCHMARK_SRCS ${PROJECT_SOURCE_DIR}/benchmark/)
+    # test pipeline benchmark
+    add_executable(test_pipeline ${BENCHMARK_SRCS}/test_pipeline.cpp)
+    target_link_libraries(test_pipeline PRIVATE 
+        core bytetrack yolo_infer depth tools yaml-cpp benchmark::benchmark
     )
+    message(STATUS "Registered benchmark: test_pipeline")
+    # test depth preprocess benchmark
+    add_executable(test_depth_preprocess ${BENCHMARK_SRCS}/test_depth_preprocess.cpp)
+    target_link_libraries(test_depth_preprocess PRIVATE
+        core bytetrack yolo_infer depth tools yaml-cpp benchmark::benchmark
+    )
+    message(STATUS "Registered benchmark: test_depth_preprocess")
+
 else()
   message(STATUS "ENABLE_BENCHMARK=OFF")
 endif()
