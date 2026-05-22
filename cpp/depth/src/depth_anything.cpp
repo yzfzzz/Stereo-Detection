@@ -8,9 +8,6 @@ std::vector<float> DepthAnything::Preprocess(const cv::Mat & image) {
     cv::resize(image, resized_image, cv::Size(input_w, input_h));
     cv::cvtColor(resized_image, rgb, cv::COLOR_BGR2RGB);
 
-    float mean[3] = { 0.485f, 0.456f, 0.406f };
-    float std[3]  = { 0.229f, 0.224f, 0.225f };
-
     std::vector<float> input_tensor;
     for (int k = 0; k < 3; k++) {
         for (int i = 0; i < resized_image.rows; i++) {

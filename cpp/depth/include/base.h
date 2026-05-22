@@ -26,10 +26,11 @@ class BaseDepthModel {
     virtual std::pair<cv::Mat, cv::Mat> GetPredictResultAsync();
 
 
-  protected:
     // 子类必须实现的专属预处理
     virtual std::vector<float> Preprocess(const cv::Mat & image) = 0;
     virtual void               PreprocessAsync(const cv::Mat & image);
+    float    mean_host[3] = { 0, 0, 0 };
+    float    std_host[3]  = { 1.0f, 1.0f, 1.0f };
 
 
   protected:
@@ -55,8 +56,6 @@ class BaseDepthModel {
     float *  mean_dev;
     float *  std_dev;
     uchar *  before_preprocess_img_data_dev;
-    float    mean_host[3] = { 0, 0, 0 };
-    float    std_host[3]  = { 1.0f, 1.0f, 1.0f };
 
     int      input_h, input_w;            // 模型输出的尺寸
     int      origin_img_w, origin_img_h;  // 原始输入图像的尺寸

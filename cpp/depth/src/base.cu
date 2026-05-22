@@ -195,7 +195,6 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
 void BaseDepthModel::PredictAsync(const cv::Mat & image) {
     // 数据异步拷贝至 GPU, 并进行 cuda 前处理
     PreprocessAsync(image);
-    // 打印buffer0数据
 
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions
@@ -235,5 +234,5 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::GetPredictResultAsync() {
 
 void BaseDepthModel::PreprocessAsync(const cv::Mat & image){
     CHECK_CUDA(cudaMemcpyAsync(before_preprocess_img_data_dev, image.data, 3 * origin_img_h * origin_img_w * sizeof(uchar), cudaMemcpyHostToDevice, stream));
-    depthPreprocess(before_preprocess_img_data_dev, (float*)buffer[0], origin_img_h, origin_img_w,input_w, input_h,  mean_dev, std_dev, stream);
+    depthPreprocess(before_preprocess_img_data_dev, (float*)buffer[0], origin_img_w, origin_img_h,input_w, input_h,  mean_dev, std_dev, stream);
 }
