@@ -125,3 +125,75 @@ void preprocess(const cv::Mat& srcImg, float* dstDevData, uchar* srcDevData, uch
     process<<<gridSize, blockSize, 0, stream>>>(midDevData, dstDevData, input_h, input_w);
 
 }
+
+
+__global__ void resize_mat2tensor_norm_kernel(uchar* src,  float* dst, int input_w, int input_h, int resized_w, int resized_h, 
+                                                float resize_scale_w, float resize_scale_h, float* mean, float* std){ 
+        
+    int dst_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int dst_idy = blockIdx.y * blockDim.y + threadIdx.y;
+    if (dst_idx >= resized_w || dst_idy >= resized_h) {
+        return;
+    }
+
+    float resize_src_x;
+    float resize_src_y;
+    int src_idx;
+    int src_idy;
+
+    // scale is src/dst, i.e. scale > 1, image will be smaller than before
+    // CentralAligned
+    resize_src_x = (dst_idx + 0.5f) * resize_scale_w - 0.5f;
+    resize_src_y = (dst_idy + 0.5f) * resize_scale_h - 0.5f;
+
+    src_idx = (int)floorf(resize_src_x);
+    src_idy = (int)floorf(resize_src_y);
+
+    resize_src_x = resize_src_x - src_idx;
+    resize_src_y = resize_src_y - src_idy;
+    float fx1y1 = resize_src_x * resize_src_y;
+    float fx0y0 = 1.0f - resize_src_x - resize_src_y + fx1y1;
+    float fx1y0 = resize_src_x - fx1y1;
+    float fx0y1 = resize_src_y - fx1y1;
+
+    #pragma unroll
+    // resize + bgr2rgb + norm + chw
+    for (int c = 0; c < 3; ++c) {
+        // clamp indices used for neighbours
+        int sx0 = min(max(src_idx, 0), input_w - 1);
+        int sy0 = min(max(src_idy, 0), input_h - 1);
+        int sx1 = min(sx0 + 1, input_w - 1);
+        int sy1 = min(sy0 + 1, input_h - 1);
+
+        // read BGR from src but map to dst channel c as RGB:
+        // read channel (2 - c) from src (so c==0 gets R)
+        float p00 = src[(sy0 * input_w + sx0) * 3 + (2 - c)];
+        float p10 = src[(sy0 * input_w + sx1) * 3 + (2 - c)];
+        float p01 = src[(sy1 * input_w + sx0) * 3 + (2 - c)];
+        float p11 = src[(sy1 * input_w + sx1) * 3 + (2 - c)];
+
+        float val = p00 * fx0y0 + p10 * fx1y0 + p01 * fx0y1 + p11 * fx1y1;
+
+        // normalize and write to CHW float dst
+        int out_idx = c * resized_h * resized_w + dst_idy * resized_w + dst_idx;
+        dst[out_idx] = (val / 255.0f - mean[c]) / std[c];
+    }
+}
+
+void depthPreprocess(uchar*      src,
+                    float*      dst,
+                    int         input_w,
+                    int         input_h,
+                    int         resized_w,
+                    int         resized_h,
+                    float*      mean,
+                    float*      std,
+                    cudaStream_t stream){ 
+    dim3 blockSize(32, 8);
+    dim3 gridSize((resized_w+31)>>5, (resized_h+7)>>3);
+
+    // mat2tensor = bgr2rgb、hwc2chw
+    resize_mat2tensor_norm_kernel<<<gridSize, blockSize, 0, stream>>>(src, dst, input_w, input_h, resized_w, resized_h, 
+                                                                    (float)input_w/resized_w, (float)input_h/resized_h, mean, std);
+
+}

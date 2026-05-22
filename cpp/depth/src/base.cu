@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cub/cub.cuh>
 #include "postprocess.h"
+#include "preprocess.h"
 #include "public.h"
 #include "scope_timer.h"
 
@@ -52,6 +53,9 @@ BaseDepthModel::~BaseDepthModel() {
     }
     if(depth_infer_min_value){
         cudaFree(depth_infer_min_value);
+    }
+    if(before_preprocess_img_data_dev){
+        cudaFree(before_preprocess_img_data_dev);
     }
 
 #if NV_TENSORRT_MAJOR < 10
@@ -137,6 +141,12 @@ void BaseDepthModel::Init(const std::string & engine_path, int img_w, int img_h)
     cudaMalloc((void **) &buffer_dst_colormap_dev, origin_img_h * origin_img_w * sizeof(uchar3));
     cudaMalloc((void **) &depth_infer_min_value, sizeof(float));
     cudaMalloc((void **) &depth_infer_max_value, sizeof(float));
+    cudaMalloc((void **) &mean_dev, 3 * sizeof(float));
+    cudaMalloc((void **) &std_dev, 3 * sizeof(float));
+    cudaMemcpy(mean_dev, mean_host, 3 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(std_dev, std_host, 3 * sizeof(float), cudaMemcpyHostToDevice);
+    CHECK_CUDA(cudaMalloc((void **) &before_preprocess_img_data_dev, 3 * origin_img_h * origin_img_w * sizeof(uchar)));
+    
     // 查询 CUB 所需临时显存大小
 
     cub::DeviceReduce::Min(nullptr, cub_min_bytes, (float*)buffer[1], depth_infer_min_value, input_h * input_w, stream);
@@ -183,9 +193,9 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::Predict(const cv::Mat & image) {
 
 
 void BaseDepthModel::PredictAsync(const cv::Mat & image) {
-    std::vector<float> input = Preprocess(image);
-    // 数据异步拷贝至 GPU
-    CHECK_CUDA(cudaMemcpyAsync(buffer[0], input.data(), 3 * input_h * input_w * sizeof(float), cudaMemcpyHostToDevice, stream));
+    // 数据异步拷贝至 GPU, 并进行 cuda 前处理
+    PreprocessAsync(image);
+    // 打印buffer0数据
 
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions
@@ -223,4 +233,7 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::GetPredictResultAsync() {
     return result;
 }
 
-
+void BaseDepthModel::PreprocessAsync(const cv::Mat & image){
+    CHECK_CUDA(cudaMemcpyAsync(before_preprocess_img_data_dev, image.data, 3 * origin_img_h * origin_img_w * sizeof(uchar), cudaMemcpyHostToDevice, stream));
+    depthPreprocess(before_preprocess_img_data_dev, (float*)buffer[0], origin_img_h, origin_img_w,input_w, input_h,  mean_dev, std_dev, stream);
+}
