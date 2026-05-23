@@ -72,7 +72,42 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessAsyncInference)(benchmark::State & 
     state.SetItemsProcessed(state.iterations());
 }
 
-BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond)->Iterations(100);
-;
+// ==================== YOLO 纯推理 Benchmark ====================
+BENCHMARK_DEFINE_F(PipelineBenchmark, YoloOnlyInference)(benchmark::State & state) {
+    for (auto _ : state) {
+        FrameInputContext frame_input_context(num_frames, frame_meta);
+        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
+            cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+            continue;
+        }
+        num_frames++;
+
+        // 仅调用 YOLO 推理（包含预处理 + TRT + CUDA NMS kernel），无后处理
+        pipeline->getDetector().inferenceAsync(frame_input_context.raw_img);
+        pipeline->getDetector().WaitAsync();  // 同步等待推理完成
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+// ==================== Depth 纯推理 Benchmark ====================
+BENCHMARK_DEFINE_F(PipelineBenchmark, DepthOnlyInference)(benchmark::State & state) {
+    for (auto _ : state) {
+        FrameInputContext frame_input_context(num_frames, frame_meta);
+        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
+            cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+            continue;
+        }
+        num_frames++;
+
+        // 仅调用 Depth 推理（包含预处理 + TRT），无后处理
+        pipeline->getDepthModel()->PredictAsync(frame_input_context.raw_img);
+        pipeline->getDepthModel()->WaitAsync();  // 同步等待推理完成
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_REGISTER_F(PipelineBenchmark, YoloOnlyInference)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, DepthOnlyInference)->Unit(benchmark::kMillisecond)->Iterations(100);
 BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond)->Iterations(100);
 BENCHMARK_MAIN();

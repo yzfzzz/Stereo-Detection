@@ -209,11 +209,11 @@ if(ENABLE_BENCHMARK)
     message(STATUS "Registered benchmark: test_depth_preprocess")
     # test jetson memory management benchmark
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-      add_executable(test_jetson_memory_management ${BENCHMARK_SRCS}/test_jetson_memory_management.cpp)
-      target_link_libraries(test_jetson_memory_management PRIVATE
+      add_executable(test_jeston_mem_manager ${BENCHMARK_SRCS}/test_jeston_mem_manager.cpp)
+      target_link_libraries(test_jeston_mem_manager PRIVATE
           core bytetrack yolo_infer depth tools yaml-cpp benchmark::benchmark
       )
-      message(STATUS "Registered benchmark: test_jetson_memory_management")
+      message(STATUS "Registered benchmark: test_jeston_mem_manager")
     endif()
     
 
