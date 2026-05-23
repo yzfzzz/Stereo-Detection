@@ -20,12 +20,12 @@ class Pipeline {
 
     BaseDepthModel * getDepthModel() { return depth_model_.get(); }
 
-
-  private:
     void postProcess(FrameInputContext &            frame_input_context,
                      InferOutputContext &           infer_output_context,
                      const std::vector<Detection> & res);
 
+
+  private:
     bool isTrackingClass(int class_id) {
         for (auto & c : trackClasses) {
             if (class_id == c) {
