@@ -16,7 +16,7 @@ if(ENABLE_TIMER)
     add_definitions(-DENABLE_TIMER)
 endif()
 
-option(ENABLE_JESTON_MEM_MANAGED "Enable Jetson memory managed" ON)
+option(ENABLE_JESTON_MEM_MANAGED "Enable Jetson memory managed" OFF)
 if(ENABLE_JESTON_MEM_MANAGED)
     message(STATUS "Enabling Jetson memory managed")
     add_definitions(-DENABLE_JESTON_MEM_MANAGED)
