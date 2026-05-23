@@ -137,8 +137,6 @@ void BaseDepthModel::Init(const std::string & engine_path, int img_w, int img_h)
     cudaMalloc(&buffer[1], input_h * input_w * sizeof(float));
     cudaMalloc((void **) &buffer_norm_depth_dev, input_h * input_w * sizeof(uchar));
     cudaMalloc((void **) &buffer_norm_colormap_dev, input_h * input_w * sizeof(uchar3));
-    cudaMalloc((void **) &buffer_dst_depth_dev, origin_img_h * origin_img_w * sizeof(uchar));
-    cudaMalloc((void **) &buffer_dst_colormap_dev, origin_img_h * origin_img_w * sizeof(uchar3));
     cudaMalloc((void **) &depth_infer_min_value, sizeof(float));
     cudaMalloc((void **) &depth_infer_max_value, sizeof(float));
     cudaMalloc((void **) &mean_dev, 3 * sizeof(float));
@@ -148,7 +146,6 @@ void BaseDepthModel::Init(const std::string & engine_path, int img_w, int img_h)
     CHECK_CUDA(cudaMalloc((void **) &before_preprocess_img_data_dev, 3 * origin_img_h * origin_img_w * sizeof(uchar)));
     
     // 查询 CUB 所需临时显存大小
-
     cub::DeviceReduce::Min(nullptr, cub_min_bytes, (float*)buffer[1], depth_infer_min_value, input_h * input_w, stream);
     cub::DeviceReduce::Max(nullptr, cub_max_bytes, (float*)buffer[1], depth_infer_max_value, input_h * input_w, stream);
     cub_bytes = std::max(cub_min_bytes, cub_max_bytes);
@@ -156,16 +153,23 @@ void BaseDepthModel::Init(const std::string & engine_path, int img_w, int img_h)
     cudaMalloc((void **) &cub_mid_max, cub_bytes);
     output_data = new float[input_h * input_w];
 
+#if NV_TENSORRT_MAJOR >= 10
+    // TRT 8.x: 不需要显式 setTensorAddress，enqueueV2 会按 binding 顺序读取 buffer 数组
+    // TRT 10.x: 必须显式设置 Tensor 地址
+    context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
+    context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
+#endif
+
     depth_output_data   = new uchar[origin_img_h * origin_img_w];
     depth_colormap_data = new uchar3[origin_img_h * origin_img_w];
-
-    #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
-        // TRT 8.x: 不需要显式 setTensorAddress，enqueueV2 会按 binding 顺序读取 buffer 数组
-    #else
-        // TRT 10.x: 必须显式设置 Tensor 地址
-        context->setTensorAddress(io_tensor_name[0].c_str(), buffer[0]);
-        context->setTensorAddress(io_tensor_name[1].c_str(), buffer[1]);
-    #endif
+#if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
+    // Jeston 上使用统一内存
+    cudaMallocManaged(&buffer_dst_depth_dev, origin_img_h * origin_img_w * sizeof(uchar));
+    cudaMallocManaged(&buffer_dst_colormap_dev, origin_img_h * origin_img_w * sizeof(uchar3));
+#else
+    cudaMalloc((void **) &buffer_dst_depth_dev, origin_img_h * origin_img_w * sizeof(uchar));
+    cudaMalloc((void **) &buffer_dst_colormap_dev, origin_img_h * origin_img_w * sizeof(uchar3));
+#endif
 
     initColorMapTable();
 }

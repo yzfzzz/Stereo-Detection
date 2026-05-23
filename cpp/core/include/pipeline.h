@@ -16,12 +16,16 @@ class Pipeline {
 
     Scalar get_color(int idx) { return tracker_.get_color(idx); }
 
+    YoloDetector & getDetector() { return detector_; }
+
+    BaseDepthModel * getDepthModel() { return depth_model_.get(); }
+
+    void postProcess(FrameInputContext &            frame_input_context,
+                     InferOutputContext &           infer_output_context,
+                     const std::vector<Detection> & res);
+
 
   private:
-    void postProcess(FrameInputContext & frame_input_context,
-                     InferOutputContext & infer_output_context,
-                     const std::vector<Detection> &res);
-
     bool isTrackingClass(int class_id) {
         for (auto & c : trackClasses) {
             if (class_id == c) {

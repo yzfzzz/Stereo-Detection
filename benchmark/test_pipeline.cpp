@@ -72,7 +72,80 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, ProcessAsyncInference)(benchmark::State & 
     state.SetItemsProcessed(state.iterations());
 }
 
-BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond)->Iterations(100);
-;
+// ==================== YOLO 纯推理 Benchmark ====================
+BENCHMARK_DEFINE_F(PipelineBenchmark, YoloOnlyInferenceAsync)(benchmark::State & state) {
+    for (auto _ : state) {
+        FrameInputContext frame_input_context(num_frames, frame_meta);
+        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
+            cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+            continue;
+        }
+        num_frames++;
+
+        // 仅调用 YOLO 推理（包含预处理 + TRT + CUDA NMS kernel），无后处理
+        pipeline->getDetector().inferenceAsync(frame_input_context.raw_img);
+        pipeline->getDetector().WaitAsync();  // 同步等待推理完成
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+// ==================== Depth 纯推理 Benchmark ====================
+BENCHMARK_DEFINE_F(PipelineBenchmark, DepthOnlyInferenceAsync)(benchmark::State & state) {
+    for (auto _ : state) {
+        FrameInputContext frame_input_context(num_frames, frame_meta);
+        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
+            cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+            continue;
+        }
+        num_frames++;
+
+        // 仅调用 Depth 推理（包含预处理 + TRT），无后处理
+        pipeline->getDepthModel()->PredictAsync(frame_input_context.raw_img);
+        pipeline->getDepthModel()->WaitAsync();  // 同步等待推理完成
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+// ==================== PostProcess 纯后处理 Benchmark ====================
+BENCHMARK_DEFINE_F(PipelineBenchmark, PostProcess)(benchmark::State & state) {
+    // 1. 准备固定的输入数据（避免 IO 和推理耗时干扰）
+    FrameInputContext      fixed_input(0, frame_meta);
+    InferOutputContext     fixed_output;
+    std::vector<Detection> fixed_detections;
+
+    if (!cap.read(fixed_input.raw_img) || fixed_input.raw_img.empty()) {
+        state.SkipWithError("Failed to read frame for postProcess benchmark");
+        return;
+    }
+
+    // 2. 执行一次完整的异步推理，获取真实的 Detections 结果
+    pipeline->getDetector().inferenceAsync(fixed_input.raw_img);
+    pipeline->getDepthModel()->PredictAsync(fixed_input.raw_img);
+    pipeline->getDepthModel()->WaitAsync();
+    pipeline->getDetector().WaitAsync();
+    fixed_detections = pipeline->getDetector().GetInferResultAsync(fixed_input.raw_img);
+
+    auto depth_result         = pipeline->getDepthModel()->GetPredictResultAsync();
+    fixed_output.result_depth = depth_result.first;
+    fixed_output.depth_vis    = depth_result.second;
+
+    // 3. 纯后处理循环测试
+    for (auto _ : state) {
+        InferOutputContext temp_output;
+        temp_output.result_depth = fixed_output.result_depth;  // 传递深度图供运动状态计算
+        temp_output.depth_vis    = fixed_output.depth_vis;
+
+        // 仅执行 postProcess（包含 ByteTrack 跟踪 + 运动状态引擎）
+        pipeline->postProcess(fixed_input, temp_output, fixed_detections);
+
+        benchmark::DoNotOptimize(temp_output);
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_REGISTER_F(PipelineBenchmark, YoloOnlyInferenceAsync)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, DepthOnlyInferenceAsync)->Unit(benchmark::kMillisecond)->Iterations(100);
 BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, PostProcess)->Unit(benchmark::kMillisecond)->Iterations(100);
 BENCHMARK_MAIN();
