@@ -11,8 +11,10 @@ class Pipeline {
     Pipeline(ConfigManager config_manager, FrameMeta frame_meta);
 
     // 核心推理接口，供正常业务和 Benchmark 调用
-    void process(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);
-    void processAsync(FrameInputContext & frame_input_context, InferOutputContext & infer_output_context);
+    void process(FrameInputContext &  frame_input_context,
+                 InferOutputContext & infer_output_context);
+    void processAsync(FrameInputContext &  frame_input_context,
+                      InferOutputContext & infer_output_context);
 
     cv::Scalar getColor(int idx) { return tracker_.getColor(idx); }
 
@@ -46,5 +48,6 @@ class Pipeline {
     cv::Mat          cached_depth_;
     cv::Mat          cached_depth_vis_;
     // 需要跟踪的类别，可以根据自己需求调整，筛选自己想要跟踪的对象的种类（以下对应COCO数据集类别索引）
-    std::vector<int> track_classes_{ 1, 2, 3, 5, 7 };  // person, bicycle, car, motorcycle, bus, truck
+    std::vector<int> track_classes_{ 1, 2, 3, 5,
+                                     7 };  // person, bicycle, car, motorcycle, bus, truck
 };

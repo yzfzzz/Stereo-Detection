@@ -141,14 +141,14 @@ void BaseDepthModel::init(const std::string & engine_path, int img_w, int img_h)
     cudaMalloc((void **) &std_dev_, 3 * sizeof(float));
     cudaMemcpy(mean_dev_, mean_host_, 3 * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(std_dev_, std_host_, 3 * sizeof(float), cudaMemcpyHostToDevice);
-    CHECK_CUDA(
-        cudaMalloc((void **) &before_preprocess_img_data_dev_, 3 * origin_img_h_ * origin_img_w_ * sizeof(uchar)));
+    CHECK_CUDA(cudaMalloc((void **) &before_preprocess_img_data_dev_,
+                          3 * origin_img_h_ * origin_img_w_ * sizeof(uchar)));
 
     // 查询 CUB 所需临时显存大小
-    cub::DeviceReduce::Min(nullptr, cub_min_bytes_, (float *) buffer_[1], depth_infer_min_value_, input_h_ * input_w_,
-                           stream_);
-    cub::DeviceReduce::Max(nullptr, cub_max_bytes_, (float *) buffer_[1], depth_infer_max_value_, input_h_ * input_w_,
-                           stream_);
+    cub::DeviceReduce::Min(nullptr, cub_min_bytes_, (float *) buffer_[1], depth_infer_min_value_,
+                           input_h_ * input_w_, stream_);
+    cub::DeviceReduce::Max(nullptr, cub_max_bytes_, (float *) buffer_[1], depth_infer_max_value_,
+                           input_h_ * input_w_, stream_);
     cub_bytes_ = std::max(cub_min_bytes_, cub_max_bytes_);
     cudaMalloc((void **) &cub_mid_min_, cub_bytes_);
     cudaMalloc((void **) &cub_mid_max_, cub_bytes_);
@@ -177,7 +177,8 @@ void BaseDepthModel::init(const std::string & engine_path, int img_w, int img_h)
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::predict(const cv::Mat & image) {
     std::vector<float> input = preProcess(image);
-    cudaMemcpy(buffer_[0], input.data(), 3 * input_h_ * input_w_ * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(buffer_[0], input.data(), 3 * input_h_ * input_w_ * sizeof(float),
+               cudaMemcpyHostToDevice);
 
     bool status = context_->executeV2(buffer_);
     if (!status) {
@@ -185,7 +186,8 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::predict(const cv::Mat & image) {
         return {};
     }
 
-    cudaMemcpy(output_data_, buffer_[1], input_h_ * input_w_ * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(output_data_, buffer_[1], input_h_ * input_w_ * sizeof(float),
+               cudaMemcpyDeviceToHost);
     cv::Mat depth_mat(input_h_, input_w_, CV_32FC1, output_data_);
     cv::normalize(depth_mat, depth_mat, 0, 255, cv::NORM_MINMAX, CV_8U);
 
@@ -211,19 +213,22 @@ void BaseDepthModel::predictAsync(const cv::Mat & image) {
         return;
     }
 
-    cub::DeviceReduce::Min(cub_mid_min_, cub_bytes_, (float *) buffer_[1], depth_infer_min_value_, input_h_ * input_w_,
-                           stream_);
-    cub::DeviceReduce::Max(cub_mid_max_, cub_bytes_, (float *) buffer_[1], depth_infer_max_value_, input_h_ * input_w_,
-                           stream_);
+    cub::DeviceReduce::Min(cub_mid_min_, cub_bytes_, (float *) buffer_[1], depth_infer_min_value_,
+                           input_h_ * input_w_, stream_);
+    cub::DeviceReduce::Max(cub_mid_max_, cub_bytes_, (float *) buffer_[1], depth_infer_max_value_,
+                           input_h_ * input_w_, stream_);
 
-    normalize_colormap_resize((float *) buffer_[1], buffer_norm_depth_dev_, buffer_norm_colormap_dev_,
-                              buffer_dst_depth_dev_, buffer_dst_colormap_dev_, depth_infer_min_value_,
-                              depth_infer_max_value_, input_w_, input_h_, origin_img_w_, origin_img_h_, stream_);
+    normalize_colormap_resize(
+        (float *) buffer_[1], buffer_norm_depth_dev_, buffer_norm_colormap_dev_,
+        buffer_dst_depth_dev_, buffer_dst_colormap_dev_, depth_infer_min_value_,
+        depth_infer_max_value_, input_w_, input_h_, origin_img_w_, origin_img_h_, stream_);
 
-    CHECK_CUDA(cudaMemcpyAsync(depth_output_data_, buffer_dst_depth_dev_, origin_img_h_ * origin_img_w_ * sizeof(uchar),
+    CHECK_CUDA(cudaMemcpyAsync(depth_output_data_, buffer_dst_depth_dev_,
+                               origin_img_h_ * origin_img_w_ * sizeof(uchar),
                                cudaMemcpyDeviceToHost, stream_));
     CHECK_CUDA(cudaMemcpyAsync(depth_colormap_data_, buffer_dst_colormap_dev_,
-                               origin_img_h_ * origin_img_w_ * sizeof(uchar3), cudaMemcpyDeviceToHost, stream_));
+                               origin_img_h_ * origin_img_w_ * sizeof(uchar3),
+                               cudaMemcpyDeviceToHost, stream_));
 }
 
 void BaseDepthModel::waitAsync() {
@@ -231,15 +236,16 @@ void BaseDepthModel::waitAsync() {
 }
 
 std::pair<cv::Mat, cv::Mat> BaseDepthModel::getPredictResultAsync() {
-    auto                        depth_output   = cv::Mat(origin_img_h_, origin_img_w_, CV_8UC1, depth_output_data_);
-    auto                        depth_colormap = cv::Mat(origin_img_h_, origin_img_w_, CV_8UC3, depth_colormap_data_);
-    std::pair<cv::Mat, cv::Mat> result         = std::make_pair(depth_output, depth_colormap);
+    auto depth_output   = cv::Mat(origin_img_h_, origin_img_w_, CV_8UC1, depth_output_data_);
+    auto depth_colormap = cv::Mat(origin_img_h_, origin_img_w_, CV_8UC3, depth_colormap_data_);
+    std::pair<cv::Mat, cv::Mat> result = std::make_pair(depth_output, depth_colormap);
     return result;
 }
 
 void BaseDepthModel::preProcessAsync(const cv::Mat & image) {
     CHECK_CUDA(cudaMemcpyAsync(before_preprocess_img_data_dev_, image.data,
-                               3 * origin_img_h_ * origin_img_w_ * sizeof(uchar), cudaMemcpyHostToDevice, stream_));
-    depthPreprocess(before_preprocess_img_data_dev_, (float *) buffer_[0], origin_img_w_, origin_img_h_, input_w_,
-                    input_h_, mean_dev_, std_dev_, stream_);
+                               3 * origin_img_h_ * origin_img_w_ * sizeof(uchar),
+                               cudaMemcpyHostToDevice, stream_));
+    depthPreprocess(before_preprocess_img_data_dev_, (float *) buffer_[0], origin_img_w_,
+                    origin_img_h_, input_w_, input_h_, mean_dev_, std_dev_, stream_);
 }

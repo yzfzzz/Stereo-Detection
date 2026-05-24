@@ -164,7 +164,8 @@ int STrack::endFrame() {
     return frame_id_;
 }
 
-void STrack::multiPredict(std::vector<STrack *> & stracks, byte_kalman::KalmanFilter & kalman_filter) {
+void STrack::multiPredict(std::vector<STrack *> &     stracks,
+                          byte_kalman::KalmanFilter & kalman_filter) {
     for (int i = 0; i < stracks.size(); i++) {
         if (stracks[i]->state_ != TrackState::TRACKED) {
             stracks[i]->mean_[7] = 0;

@@ -115,14 +115,16 @@ void preprocess(const cv::Mat & srcImg,
         y = 0;
     }
 
-    cudaMemcpyAsync(srcDevData, srcImg.data, sizeof(uchar) * raw_img_h * raw_img_w * 3, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(srcDevData, srcImg.data, sizeof(uchar) * raw_img_h * raw_img_w * 3,
+                    cudaMemcpyHostToDevice, stream);
 
     dim3 blockSize(32, 32);
-    dim3 gridSize((input_w + blockSize.x - 1) / blockSize.x, (input_h + blockSize.y - 1) / blockSize.y);
+    dim3 gridSize((input_w + blockSize.x - 1) / blockSize.x,
+                  (input_h + blockSize.y - 1) / blockSize.y);
 
     // letterbox and resize
-    letterbox<<<gridSize, blockSize, 0, stream>>>(srcDevData, raw_img_h, raw_img_w, midDevData, input_h, input_w, h, w,
-                                                  y, x);
+    letterbox<<<gridSize, blockSize, 0, stream>>>(srcDevData, raw_img_h, raw_img_w, midDevData,
+                                                  input_h, input_w, h, w, y, x);
     // hwc to chw / bgr to rgb / normalize
     process<<<gridSize, blockSize, 0, stream>>>(midDevData, dstDevData, input_h, input_w);
 }
@@ -200,7 +202,7 @@ void depthPreprocess(uchar *      src,
     dim3 gridSize((resized_w + 31) >> 5, (resized_h + 7) >> 3);
 
     // mat2tensor = bgr2rgb、hwc2chw
-    resize_mat2tensor_norm_kernel<<<gridSize, blockSize, 0, stream>>>(src, dst, input_w, input_h, resized_w, resized_h,
-                                                                      (float) input_w / resized_w,
-                                                                      (float) input_h / resized_h, mean, std);
+    resize_mat2tensor_norm_kernel<<<gridSize, blockSize, 0, stream>>>(
+        src, dst, input_w, input_h, resized_w, resized_h, (float) input_w / resized_w,
+        (float) input_h / resized_h, mean, std);
 }

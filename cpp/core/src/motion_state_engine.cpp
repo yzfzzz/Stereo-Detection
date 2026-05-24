@@ -14,7 +14,9 @@ MotionStateEngine::MotionStateEngine(float velocity_threshold,
     kf_process_noise_cov_(kf_process_noise_cov),
     kf_measurement_noise_cov_(kf_measurement_noise_cov) {}
 
-MotionStateInfoRecord MotionStateEngine::computeMotionState(int track_id, float raw_value, double timestamp) {
+MotionStateInfoRecord MotionStateEngine::computeMotionState(int    track_id,
+                                                            float  raw_value,
+                                                            double timestamp) {
     if (raw_value <= 0.0f) {
         return MotionStateInfoRecord(MotionState::INVAILD, MotionState::INVAILD, 0.0f);
     }
@@ -128,7 +130,9 @@ float MotionStateEngine::getObjectDepth(cv::Mat depth, const STrack & track, cv:
     return depth_value;
 }
 
-float MotionStateEngine::computeMeanDepth(cv::Mat depth, const std::vector<float> & tlwh, int num_samples) const {
+float MotionStateEngine::computeMeanDepth(cv::Mat                    depth,
+                                          const std::vector<float> & tlwh,
+                                          int                        num_samples) const {
     int left   = static_cast<int>(tlwh[0]);
     int top    = static_cast<int>(tlwh[1]);
     int right  = static_cast<int>(tlwh[0] + tlwh[2]);
@@ -167,9 +171,11 @@ float MotionStateEngine::computeMeanDepth(cv::Mat depth, const std::vector<float
             // 比如只采样框的中心 60% 区域：
             float shrink_ratio = 0.2f;  // 上下左右各缩进20%
             int   x            = left + static_cast<int>(width * shrink_ratio) +
-                    static_cast<int>(i * (width * (1.0f - 2 * shrink_ratio)) / std::max(1, grid_size - 1));
+                    static_cast<int>(i * (width * (1.0f - 2 * shrink_ratio)) /
+                                     std::max(1, grid_size - 1));
             int y = top + static_cast<int>(height * shrink_ratio) +
-                    static_cast<int>(j * (height * (1.0f - 2 * shrink_ratio)) / std::max(1, grid_size - 1));
+                    static_cast<int>(j * (height * (1.0f - 2 * shrink_ratio)) /
+                                     std::max(1, grid_size - 1));
 
             if (x < 0 || x >= depth.cols || y < 0 || y >= depth.rows) {
                 continue;
@@ -209,7 +215,7 @@ float MotionStateEngine::computeMeanDepth(cv::Mat depth, const std::vector<float
         return sampled_depths[num_valid / 2];
     }
 
-    int skip_low  = static_cast<int>(num_valid * 0.25f);  // 剔除25%最近距离（前景毛刺与遮挡）
+    int skip_low = static_cast<int>(num_valid * 0.25f);  // 剔除25%最近距离（前景毛刺与遮挡）
     int skip_high = static_cast<int>(num_valid * 0.25f);  // 剔除25%最远距离（背景噪声）
 
     float sum   = 0.0f;

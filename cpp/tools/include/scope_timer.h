@@ -11,7 +11,9 @@
 
 class ScopedTimer {
   public:
-    explicit ScopedTimer(std::string name) : name_(std::move(name)), start_(std::chrono::steady_clock::now()) {}
+    explicit ScopedTimer(std::string name) :
+        name_(std::move(name)),
+        start_(std::chrono::steady_clock::now()) {}
 
     ~ScopedTimer();
 

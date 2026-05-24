@@ -16,8 +16,8 @@ class Int8EntropyCalibrator2 : public nvinfer1::IInt8EntropyCalibrator2 {
                            bool         read_cache = true);
 
     virtual ~Int8EntropyCalibrator2();
-    int          getBatchSize() const noexcept override;
-    bool         getBatch(void * bindings[], const char * names[], int nbBindings) noexcept override;
+    int  getBatchSize() const noexcept override;
+    bool getBatch(void * bindings[], const char * names[], int nbBindings) noexcept override;
     const void * readCalibrationCache(size_t & length) noexcept override;
     void         writeCalibrationCache(const void * cache, size_t length) noexcept override;
 

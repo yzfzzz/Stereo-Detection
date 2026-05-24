@@ -12,7 +12,8 @@ class STrack {
     ~STrack();
 
     static std::vector<float> tlbrToTlwh(std::vector<float> & tlbr);
-    static void               multiPredict(std::vector<STrack *> & stracks, byte_kalman::KalmanFilter & kalman_filter);
+    static void               multiPredict(std::vector<STrack *> &     stracks,
+                                           byte_kalman::KalmanFilter & kalman_filter);
     void                      staticTlwh();
     void                      staticTlbr();
     std::vector<float>        tlwhToXyah(std::vector<float> tlwh_tmp);

@@ -76,7 +76,9 @@ int Int8EntropyCalibrator2::getBatchSize() const noexcept {
     return batch_size_;
 }
 
-bool Int8EntropyCalibrator2::getBatch(void * bindings[], const char * names[], int nbBindings) noexcept {
+bool Int8EntropyCalibrator2::getBatch(void *       bindings[],
+                                      const char * names[],
+                                      int          nbBindings) noexcept {
     if (img_idx_ + batch_size_ > (int) img_files_.size()) {
         return false;
     }
@@ -106,7 +108,8 @@ const void * Int8EntropyCalibrator2::readCalibrationCache(size_t & length) noexc
     std::ifstream input(calib_table_name_, std::ios::binary);
     input >> std::noskipws;
     if (read_cache_ && input.good()) {
-        std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(), std::back_inserter(calib_cache_));
+        std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+                  std::back_inserter(calib_cache_));
     }
     length = calib_cache_.size();
     return length ? calib_cache_.data() : nullptr;

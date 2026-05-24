@@ -71,7 +71,8 @@ std::vector<STrack> BYTETracker::update(const std::vector<Object> & objects) {
 
     std::vector<std::vector<int>> matches;
     std::vector<int>              u_track, u_detection;
-    linearAssignment(dists, dist_size, dist_size_size, match_thresh_, matches, u_track, u_detection);
+    linearAssignment(dists, dist_size, dist_size_size, match_thresh_, matches, u_track,
+                     u_detection);
 
     for (int i = 0; i < matches.size(); i++) {
         STrack * track = strack_pool[matches[i][0]];

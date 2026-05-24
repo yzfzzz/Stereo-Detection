@@ -19,9 +19,10 @@ class PipelineBenchmark : public benchmark::Fixture {
         if (!cap.isOpened()) {
             throw std::runtime_error("Failed to open video");
         }
-        frame_meta = FrameMeta(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT),
-                               cap.get(cv::CAP_PROP_FPS), FrameSource::VIDEO);
-        pipeline   = std::make_unique<Pipeline>(config_manager, frame_meta);
+        frame_meta =
+            FrameMeta(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT),
+                      cap.get(cv::CAP_PROP_FPS), FrameSource::VIDEO);
+        pipeline = std::make_unique<Pipeline>(config_manager, frame_meta);
 
         // Warmup: 跑 5 帧让 GPU 预热
         for (int i = 0; i < 20; ++i) {
@@ -133,7 +134,7 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, PostProcess)(benchmark::State & state) {
     for (auto _ : state) {
         InferOutputContext temp_output;
         temp_output.result_depth = fixed_output.result_depth;  // 传递深度图供运动状态计算
-        temp_output.depth_vis    = fixed_output.depth_vis;
+        temp_output.depth_vis = fixed_output.depth_vis;
 
         // 仅执行 postProcess（包含 ByteTrack 跟踪 + 运动状态引擎）
         pipeline->postProcess(fixed_input, temp_output, fixed_detections);
@@ -143,9 +144,19 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, PostProcess)(benchmark::State & state) {
     state.SetItemsProcessed(state.iterations());
 }
 
-BENCHMARK_REGISTER_F(PipelineBenchmark, YoloOnlyInferenceAsync)->Unit(benchmark::kMillisecond)->Iterations(100);
-BENCHMARK_REGISTER_F(PipelineBenchmark, DepthOnlyInferenceAsync)->Unit(benchmark::kMillisecond)->Iterations(100);
-BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)->Unit(benchmark::kMillisecond)->Iterations(100);
-BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)->Unit(benchmark::kMillisecond)->Iterations(100);
-BENCHMARK_REGISTER_F(PipelineBenchmark, PostProcess)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, YoloOnlyInferenceAsync)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, DepthOnlyInferenceAsync)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessInference)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, ProcessAsyncInference)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
+BENCHMARK_REGISTER_F(PipelineBenchmark, PostProcess)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
 BENCHMARK_MAIN();

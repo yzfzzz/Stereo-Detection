@@ -6,14 +6,14 @@
 #include <iostream>
 #include <memory>
 
-#define CHECK_CUDA(call)                                                                                        \
-    do {                                                                                                        \
-        cudaError_t status = call;                                                                              \
-        if (status != cudaSuccess) {                                                                            \
-            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " << cudaGetErrorString(status) \
-                      << std::endl;                                                                             \
-            exit(EXIT_FAILURE);                                                                                 \
-        }                                                                                                       \
+#define CHECK_CUDA(call)                                                          \
+    do {                                                                          \
+        cudaError_t status = call;                                                \
+        if (status != cudaSuccess) {                                              \
+            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " \
+                      << cudaGetErrorString(status) << std::endl;                 \
+            exit(EXIT_FAILURE);                                                   \
+        }                                                                         \
     } while (0)
 
 enum ResolutionKey { P480 = 0, P720 = 1, K1 = 2, K2 = 3, K4 = 4 };
@@ -39,7 +39,8 @@ class JetsonManagedMemory {
         CHECK_CUDA(cudaMallocManaged(&depth_buffer, depth_size));
         CHECK_CUDA(cudaMallocManaged(&colormap_buffer, colormap_size));
 #else
-        std::cerr << "Unified memory optimization is only enabled for ARM64 (Jetson) platforms." << std::endl;
+        std::cerr << "Unified memory optimization is only enabled for ARM64 (Jetson) platforms."
+                  << std::endl;
         exit(EXIT_FAILURE);
 #endif
 
@@ -52,22 +53,27 @@ class JetsonManagedMemory {
     void transferHostToDevice(cudaStream_t stream) {
 #if defined(__aarch64__)
         // 统一内存：使用 cudaMemcpy 触发 CPU -> GPU 页迁移
-        CHECK_CUDA(cudaMemcpyAsync(depth_buffer, depth_output, width * height * sizeof(unsigned char),
-                                   cudaMemcpyHostToDevice, stream));
-        CHECK_CUDA(cudaMemcpyAsync(colormap_buffer, colormap_output, width * height * sizeof(char) * 3,
-                                   cudaMemcpyHostToDevice, stream));
+        CHECK_CUDA(cudaMemcpyAsync(depth_buffer, depth_output,
+                                   width * height * sizeof(unsigned char), cudaMemcpyHostToDevice,
+                                   stream));
+        CHECK_CUDA(cudaMemcpyAsync(colormap_buffer, colormap_output,
+                                   width * height * sizeof(char) * 3, cudaMemcpyHostToDevice,
+                                   stream));
 #endif
     }
 
     void transferDeviceToHost(cudaStream_t stream) {
 #if defined(__aarch64__)
         // 统一内存：使用 cudaMemcpy 触发 GPU -> CPU 页迁移
-        CHECK_CUDA(cudaMemcpyAsync(depth_output, depth_buffer, width * height * sizeof(unsigned char),
-                                   cudaMemcpyDeviceToHost, stream));
-        CHECK_CUDA(cudaMemcpyAsync(colormap_output, colormap_buffer, width * height * sizeof(char) * 3,
-                                   cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaMemcpyAsync(depth_output, depth_buffer,
+                                   width * height * sizeof(unsigned char), cudaMemcpyDeviceToHost,
+                                   stream));
+        CHECK_CUDA(cudaMemcpyAsync(colormap_output, colormap_buffer,
+                                   width * height * sizeof(char) * 3, cudaMemcpyDeviceToHost,
+                                   stream));
 #else
-        std::cerr << "Unified memory optimization is only enabled for ARM64 (Jetson) platforms." << std::endl;
+        std::cerr << "Unified memory optimization is only enabled for ARM64 (Jetson) platforms."
+                  << std::endl;
         exit(EXIT_FAILURE);
 #endif
     }
@@ -106,17 +112,21 @@ class TraditionalMemory {
     }
 
     void transferHostToDevice(cudaStream_t stream) {
-        CHECK_CUDA(cudaMemcpyAsync(depth_buffer, depth_output, width * height * sizeof(unsigned char),
-                                   cudaMemcpyHostToDevice, stream));
-        CHECK_CUDA(cudaMemcpyAsync(colormap_buffer, colormap_output, width * height * sizeof(char) * 3,
-                                   cudaMemcpyHostToDevice, stream));
+        CHECK_CUDA(cudaMemcpyAsync(depth_buffer, depth_output,
+                                   width * height * sizeof(unsigned char), cudaMemcpyHostToDevice,
+                                   stream));
+        CHECK_CUDA(cudaMemcpyAsync(colormap_buffer, colormap_output,
+                                   width * height * sizeof(char) * 3, cudaMemcpyHostToDevice,
+                                   stream));
     }
 
     void transferDeviceToHost(cudaStream_t stream) {
-        CHECK_CUDA(cudaMemcpyAsync(depth_output, depth_buffer, width * height * sizeof(unsigned char),
-                                   cudaMemcpyDeviceToHost, stream));
-        CHECK_CUDA(cudaMemcpyAsync(colormap_output, colormap_buffer, width * height * sizeof(char) * 3,
-                                   cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaMemcpyAsync(depth_output, depth_buffer,
+                                   width * height * sizeof(unsigned char), cudaMemcpyDeviceToHost,
+                                   stream));
+        CHECK_CUDA(cudaMemcpyAsync(colormap_output, colormap_buffer,
+                                   width * height * sizeof(char) * 3, cudaMemcpyDeviceToHost,
+                                   stream));
     }
 
     void cleanup() {

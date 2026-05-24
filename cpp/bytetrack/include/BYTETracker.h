@@ -6,7 +6,7 @@ struct Object {
     cv::Rect_<float> rect;
     int              label;
     float            prob;
-    float            distance;  // 目标距离，单位为米，只有在metric深度图时才有意义
+    float distance;  // 目标距离，单位为米，只有在metric深度图时才有意义
 };
 
 class BYTETracker {
@@ -18,7 +18,8 @@ class BYTETracker {
     cv::Scalar          getColor(int idx);
 
   private:
-    std::vector<STrack *> jointStracks(std::vector<STrack *> & tlista, std::vector<STrack> & tlistb);
+    std::vector<STrack *> jointStracks(std::vector<STrack *> & tlista,
+                                       std::vector<STrack> &   tlistb);
     std::vector<STrack>   jointStracks(std::vector<STrack> & tlista, std::vector<STrack> & tlistb);
 
     std::vector<STrack> subStracks(std::vector<STrack> & tlista, std::vector<STrack> & tlistb);
@@ -38,7 +39,8 @@ class BYTETracker {
                                                 std::vector<STrack> &   btracks,
                                                 int &                   dist_size,
                                                 int &                   dist_size_size);
-    std::vector<std::vector<float>> iouDistance(std::vector<STrack> & atracks, std::vector<STrack> & btracks);
+    std::vector<std::vector<float>> iouDistance(std::vector<STrack> & atracks,
+                                                std::vector<STrack> & btracks);
     std::vector<std::vector<float>> ious(std::vector<std::vector<float>> & atlbrs,
                                          std::vector<std::vector<float>> & btlbrs);
 

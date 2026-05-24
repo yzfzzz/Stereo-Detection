@@ -13,7 +13,8 @@ std::vector<float> DepthAnything::preProcess(const cv::Mat & image) {
     for (int k = 0; k < 3; k++) {
         for (int i = 0; i < resized_image.rows; i++) {
             for (int j = 0; j < resized_image.cols; j++) {
-                input_tensor.emplace_back(((float) rgb.at<cv::Vec3b>(i, j)[k] / 255.0f - mean_[k]) / std_[k]);
+                input_tensor.emplace_back(((float) rgb.at<cv::Vec3b>(i, j)[k] / 255.0f - mean_[k]) /
+                                          std_[k]);
             }
         }
     }

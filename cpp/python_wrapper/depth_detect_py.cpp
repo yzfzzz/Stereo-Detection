@@ -20,7 +20,8 @@ void bind_detection(py::module & m) {
         .def_readwrite("conf", &Detection::conf)
         .def_readwrite("class_id", &Detection::classId)
         .def("__repr__", [](const Detection & d) {
-            return py::str("Detection(bbox={}, conf={:.2f}, class_id={})").format(d.bbox, d.conf, d.classId);
+            return py::str("Detection(bbox={}, conf={:.2f}, class_id={})")
+                .format(d.bbox, d.conf, d.classId);
         });
 }
 
@@ -54,8 +55,9 @@ void bind_motion_state_info_record(py::module & m) {
 // ==================== 绑定 YoloDetector ====================
 void bind_yolo_detector(py::module & m) {
     py::class_<YoloDetector>(m, "YoloDetector")
-        .def(py::init<const std::string &, int, float, float, int>(), py::arg("trt_file"), py::arg("gpu_id") = 0,
-             py::arg("nms_thresh") = 0.45f, py::arg("conf_thresh") = 0.25f, py::arg("num_class") = 80)
+        .def(py::init<const std::string &, int, float, float, int>(), py::arg("trt_file"),
+             py::arg("gpu_id") = 0, py::arg("nms_thresh") = 0.45f, py::arg("conf_thresh") = 0.25f,
+             py::arg("num_class") = 80)
         .def("inference", &YoloDetector::inference, py::arg("img"),
              "Run inference on the input image and return a list of Detection results");
 }
@@ -67,9 +69,11 @@ void bind_depth_models(py::module & m) {
              "Initialize the depth model with the given engine path")
         .def("predict", &BaseDepthModel::predict, py::arg("image"), "Run depth prediction");
 
-    py::class_<DepthAnything, BaseDepthModel, std::shared_ptr<DepthAnything>>(m, "DepthAnything").def(py::init<>());
+    py::class_<DepthAnything, BaseDepthModel, std::shared_ptr<DepthAnything>>(m, "DepthAnything")
+        .def(py::init<>());
 
-    py::class_<LiteMono, BaseDepthModel, std::shared_ptr<LiteMono>>(m, "LiteMono").def(py::init<>());
+    py::class_<LiteMono, BaseDepthModel, std::shared_ptr<LiteMono>>(m, "LiteMono")
+        .def(py::init<>());
 }
 
 // ==================== 绑定 MotionStateEngine ====================
@@ -78,10 +82,10 @@ void bind_motion_state_engine(py::module & m) {
         .def(py::init<float, float, float, float>(), py::arg("velocity_threshold") = 5.0f,
              py::arg("acceleration_threshold") = 1.5f, py::arg("kf_process_noise_cov") = 2e-2f,
              py::arg("kf_measurement_noise_cov") = 5e-2f)
-        .def("compute_motion_state", &MotionStateEngine::computeMotionState, py::arg("track_id"), py::arg("raw_depth"),
-             py::arg("timestamp"), "Compute motion state using Kalman filter")
-        .def("get_object_depth", &MotionStateEngine::getObjectDepth, py::arg("depth"), py::arg("track"),
-             py::arg("image_size"));
+        .def("compute_motion_state", &MotionStateEngine::computeMotionState, py::arg("track_id"),
+             py::arg("raw_depth"), py::arg("timestamp"), "Compute motion state using Kalman filter")
+        .def("get_object_depth", &MotionStateEngine::getObjectDepth, py::arg("depth"),
+             py::arg("track"), py::arg("image_size"));
 }
 
 // ==================== 绑定 BYTETracker ====================
@@ -97,7 +101,8 @@ void bind_byte_tracker(py::module & m) {
             },
             [](Object & self, py::sequence seq) {
                 if (py::len(seq) != 4) {
-                    throw std::runtime_error("Object.rect must be a sequence of 4 elements: [x, y, w, h]");
+                    throw std::runtime_error(
+                        "Object.rect must be a sequence of 4 elements: [x, y, w, h]");
                 }
                 self.rect.x      = py::cast<float>(seq[0]);
                 self.rect.y      = py::cast<float>(seq[1]);
@@ -120,7 +125,8 @@ void bind_byte_tracker(py::module & m) {
     py::class_<BYTETracker>(m, "BYTETracker")
         .def(py::init<int, int>(), py::arg("frame_rate") = 30, py::arg("track_buffer") = 30)
         .def(
-            "update", [](BYTETracker & self, std::vector<Object> & objects) { return self.update(objects); },
+            "update",
+            [](BYTETracker & self, std::vector<Object> & objects) { return self.update(objects); },
             py::arg("objects"), "Update tracker with new detections");
 }
 

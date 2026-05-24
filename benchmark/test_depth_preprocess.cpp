@@ -98,7 +98,8 @@ BENCHMARK_DEFINE_F(PreprocessBenchmark, CPU_Preprocess_With_Copy)(benchmark::Sta
         std::vector<float> input = depth_model->preProcess(img);
 
         // 同步拷贝到 GPU（与原来的 Predict 一致）
-        cudaMemcpy(gpu_dst, input.data(), 3 * model_h * model_w * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(gpu_dst, input.data(), 3 * model_h * model_w * sizeof(float),
+                   cudaMemcpyHostToDevice);
 
         benchmark::DoNotOptimize(gpu_dst);
     }
@@ -125,8 +126,12 @@ BENCHMARK_DEFINE_F(PreprocessBenchmark, GPU_depthPreprocess)(benchmark::State & 
     state.SetItemsProcessed(state.iterations());
 }
 
-BENCHMARK_REGISTER_F(PreprocessBenchmark, CPU_Preprocess_With_Copy)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PreprocessBenchmark, CPU_Preprocess_With_Copy)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
 
-BENCHMARK_REGISTER_F(PreprocessBenchmark, GPU_depthPreprocess)->Unit(benchmark::kMillisecond)->Iterations(100);
+BENCHMARK_REGISTER_F(PreprocessBenchmark, GPU_depthPreprocess)
+    ->Unit(benchmark::kMillisecond)
+    ->Iterations(100);
 
 BENCHMARK_MAIN();

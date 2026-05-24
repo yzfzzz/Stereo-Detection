@@ -35,7 +35,9 @@ struct FrameInputContext {
         if (meta.frame_source == FrameSource::VIDEO) {
             timestamp = (meta.fps > 0.0) ? (frame_id / meta.fps) : 0.0;
         } else if (meta.frame_source == FrameSource::CAMERA) {
-            timestamp = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            timestamp =
+                std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch())
+                    .count();
         }
     }
 

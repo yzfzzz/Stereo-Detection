@@ -12,14 +12,14 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-#define CHECK_CUDA(call)                                                                                        \
-    do {                                                                                                        \
-        cudaError_t status = call;                                                                              \
-        if (status != cudaSuccess) {                                                                            \
-            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " << cudaGetErrorString(status) \
-                      << std::endl;                                                                             \
-            exit(EXIT_FAILURE);                                                                                 \
-        }                                                                                                       \
+#define CHECK_CUDA(call)                                                          \
+    do {                                                                          \
+        cudaError_t status = call;                                                \
+        if (status != cudaSuccess) {                                              \
+            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " \
+                      << cudaGetErrorString(status) << std::endl;                 \
+            exit(EXIT_FAILURE);                                                   \
+        }                                                                         \
     } while (0)
 
 class Logger : public nvinfer1::ILogger {

@@ -43,14 +43,18 @@ const std::map<std::pair<MotionState, MotionState>, std::string> MOTION_STR_MAP 
 
 class MotionStateEngine {
   public:
-    MotionStateEngine(float velocity_threshold = 5.0f, float acceleration_threshold = 1.5f,
-                      float kf_process_noise_cov = 2e-2f, float kf_measurement_noise_cov = 5e-2f);
+    MotionStateEngine(float velocity_threshold       = 5.0f,
+                      float acceleration_threshold   = 1.5f,
+                      float kf_process_noise_cov     = 2e-2f,
+                      float kf_measurement_noise_cov = 5e-2f);
 
     MotionStateInfoRecord computeMotionState(int track_id, float raw_depth, double timestamp);
 
     float getObjectDepth(cv::Mat depth, const STrack & track, cv::Size image_size);
 
-    float computeMeanDepth(cv::Mat depth, const std::vector<float> & tlwh, int num_samples = 64) const;
+    float computeMeanDepth(cv::Mat                    depth,
+                           const std::vector<float> & tlwh,
+                           int                        num_samples = 64) const;
 
   private:
     struct KalmanState {

@@ -42,8 +42,8 @@ class BaseDepthModel {
 
     uchar *  buffer_norm_depth_dev_;     // 经过正则化的深度图，size = img_h*img_w
     uchar3 * buffer_norm_colormap_dev_;  // 颜色图,size = img_h*img_w*3
-    uchar *  buffer_dst_depth_dev_;      // 经过正则化的深度图，size = origin_img_w*origin_img_h
-    uchar3 * buffer_dst_colormap_dev_;   // 颜色图,size = origin_img_w*origin_img_h*3
+    uchar * buffer_dst_depth_dev_;  // 经过正则化的深度图，size = origin_img_w*origin_img_h
+    uchar3 * buffer_dst_colormap_dev_;  // 颜色图,size = origin_img_w*origin_img_h*3
     float *  depth_infer_min_value_;
     float *  depth_infer_max_value_;
     void *   cub_mid_min_   = nullptr;

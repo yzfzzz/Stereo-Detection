@@ -16,10 +16,13 @@ ConfigManager::ConfigManager(std::string config_path) {
     out_dir_   = config_["io_manager"]["out_dir"].as<std::string>("out_dir");
 
     // 运动状态引擎相关配置
-    motion_velocity_threshold_     = config_["motion_state_engine"]["velocity_threshold"].as<float>(5.0f);
-    motion_acceleration_threshold_ = config_["motion_state_engine"]["acceleration_threshold"].as<float>(1.5f);
-    kf_process_noise_cov_          = config_["motion_state_engine"]["kf_process_noise_cov"].as<float>(2e-2f);
-    kf_measurement_noise_cov_      = config_["motion_state_engine"]["kf_measurement_noise_cov"].as<float>(5e-2f);
+    motion_velocity_threshold_ =
+        config_["motion_state_engine"]["velocity_threshold"].as<float>(5.0f);
+    motion_acceleration_threshold_ =
+        config_["motion_state_engine"]["acceleration_threshold"].as<float>(1.5f);
+    kf_process_noise_cov_ = config_["motion_state_engine"]["kf_process_noise_cov"].as<float>(2e-2f);
+    kf_measurement_noise_cov_ =
+        config_["motion_state_engine"]["kf_measurement_noise_cov"].as<float>(5e-2f);
 }
 
 std::string ConfigManager::getYoloEnginePath() const {

@@ -15,7 +15,9 @@ void onMouse(int event, int x, int y, int flags, void * userdata) {
     }
 }
 
-DisplayManager::DisplayManager(ConfigManager & config, const std::string & window_name, cv::Size display_size) :
+DisplayManager::DisplayManager(ConfigManager &     config,
+                               const std::string & window_name,
+                               cv::Size            display_size) :
     enabled_(config.isDisplayEnabled()),
     window_name_(window_name),
     display_size_(display_size) {
@@ -90,7 +92,8 @@ float DisplayManager::computeMeanDepth(const std::vector<float> & tlwh) const {
                 depth = static_cast<float>(depth_map_.at<uchar>(y, x));
             } else {
                 // 处理其他类型
-                std::cout << "[DEBUG] Unsupported depth map type: " << depth_map_.type() << std::endl;
+                std::cout << "[DEBUG] Unsupported depth map type: " << depth_map_.type()
+                          << std::endl;
             }
 
             if (depth == 0) {
@@ -102,8 +105,8 @@ float DisplayManager::computeMeanDepth(const std::vector<float> & tlwh) const {
         }
     }
 
-    std::cout << "[DEBUG] Samples: total=" << num_samples << ", valid=" << valid_count << ", zero=" << zero_count
-              << std::endl;
+    std::cout << "[DEBUG] Samples: total=" << num_samples << ", valid=" << valid_count
+              << ", zero=" << zero_count << std::endl;
 
     return (valid_count > 0) ? (sum_depth / valid_count) : 0.0f;
 }
@@ -120,8 +123,8 @@ void DisplayManager::printTargetInfo(const STrack & track) const {
     std::cout << "Class: " << V_CLASS_NAMES[class_id] << std::endl;
     std::cout << "Track ID: " << track_id << std::endl;
     std::cout << "Depth (mean of 25 samples): " << depth << std::endl;
-    std::cout << "BBox: [" << tlwh[0] << ", " << tlwh[1] << ", " << tlwh[0] + tlwh[2] << ", " << tlwh[1] + tlwh[3]
-              << "]" << std::endl;
+    std::cout << "BBox: [" << tlwh[0] << ", " << tlwh[1] << ", " << tlwh[0] + tlwh[2] << ", "
+              << tlwh[1] + tlwh[3] << "]" << std::endl;
     std::cout << "==================\n" << std::endl;
 }
 
@@ -189,7 +192,8 @@ int DisplayManager::waitKey(int delay) {
     return cv::waitKey(delay);
 }
 
-DrawingManager::DrawingManager(const std::vector<std::string> & class_names) : vClassNames_(class_names) {}
+DrawingManager::DrawingManager(const std::vector<std::string> & class_names) :
+    vClassNames_(class_names) {}
 
 void DrawingManager::drawTrackedObject(cv::Mat &                     img,
                                        const STrack &                track,
@@ -200,11 +204,12 @@ void DrawingManager::drawTrackedObject(cv::Mat &                     img,
     int                        track_id = track.track_id_;
 
     // 1. 获取运动状态字符串
-    auto        it               = MOTION_STR_MAP.find({ motion_state.state_vec, motion_state.state_acc });
+    auto        it = MOTION_STR_MAP.find({ motion_state.state_vec, motion_state.state_acc });
     std::string motion_state_str = (it != MOTION_STR_MAP.end()) ? it->second : "Unknown";
 
     // 2. 准备文字标签
-    std::string label = cv::format("%s #%d [%s]", vClassNames_[class_id].c_str(), track_id, motion_state_str.c_str());
+    std::string label = cv::format("%s #%d [%s]", vClassNames_[class_id].c_str(), track_id,
+                                   motion_state_str.c_str());
 
     // 3. 绘制文字背景框和文字
     int      baseLine   = 0;
@@ -213,14 +218,16 @@ void DrawingManager::drawTrackedObject(cv::Mat &                     img,
                      cv::Size(label_size.width + 8, label_size.height + 8));
 
     cv::rectangle(img, rect_bg, color, cv::FILLED);
-    cv::putText(img, label, cv::Point((int) tlwh[0] + 4, (int) tlwh[1] - 4), cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
+    cv::putText(img, label, cv::Point((int) tlwh[0] + 4, (int) tlwh[1] - 4),
+                cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
 
     // 4. 绘制目标主体矩形框
-    cv::rectangle(img, cv::Rect((int) tlwh[0], (int) tlwh[1], (int) tlwh[2], (int) tlwh[3]), color, 2);
+    cv::rectangle(img, cv::Rect((int) tlwh[0], (int) tlwh[1], (int) tlwh[2], (int) tlwh[3]), color,
+                  2);
 
     // 5. 检查运动状态是否为"加速靠近"，如果是则绘制红色交叉
-    if (motion_state.state_vec == MotionState::APPROACH && motion_state.state_acc == MotionState::ACCELE) {
+    if (motion_state.state_vec == MotionState::APPROACH &&
+        motion_state.state_acc == MotionState::ACCELE) {
         int x1 = static_cast<int>(tlwh[0]);
         int y1 = static_cast<int>(tlwh[1]);
         int x2 = static_cast<int>(tlwh[0] + tlwh[2]);
@@ -236,9 +243,13 @@ void DrawingManager::drawTrackedObject(cv::Mat &                     img,
     }
 }
 
-void DrawingManager::drawGlobalInfo(cv::Mat & img, int num_frames, int show_fps, size_t num_tracks) {
-    cv::putText(img, cv::format("frame: %d fps: %d num: %zu", num_frames, show_fps, num_tracks), cv::Point(0, 30),
-                cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+void DrawingManager::drawGlobalInfo(cv::Mat & img,
+                                    int       num_frames,
+                                    int       show_fps,
+                                    size_t    num_tracks) {
+    cv::putText(img, cv::format("frame: %d fps: %d num: %zu", num_frames, show_fps, num_tracks),
+                cv::Point(0, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 2,
+                cv::LINE_AA);
 }
 
 cv::Mat DrawingManager::concatenateFrames(const cv::Mat & rgb_img, const cv::Mat & depth_vis) {
@@ -265,7 +276,8 @@ cv::Mat DrawingManager::concatenateFrames(const cv::Mat & rgb_img, const cv::Mat
     rgb_img.copyTo(out_frame(cv::Rect(0, 0, rgb_img.cols, rgb_img.rows)));
 
     // 拷贝深度图到下半部分
-    resized_depth_vis.copyTo(out_frame(cv::Rect(0, rgb_img.rows, rgb_img.cols, resized_depth_vis.rows)));
+    resized_depth_vis.copyTo(
+        out_frame(cv::Rect(0, rgb_img.rows, rgb_img.cols, resized_depth_vis.rows)));
 
     return out_frame;
 }
