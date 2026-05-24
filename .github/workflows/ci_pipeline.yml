@@ -62,6 +62,8 @@ jobs:
     name: Format Check
     needs: detect_changes
     if: needs.detect_changes.outputs.compile_needed == 'true'
+    outputs:
+      format_ok: ${{ steps.format_result.outputs.format_ok }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -71,6 +73,13 @@ jobs:
 
       - name: Check formatting diff
         run: git diff --exit-code
+
+      - name: Mark format check passed
+        id: format_result
+        if: success()
+        run: |
+          echo "format_ok=true" >> "$GITHUB_OUTPUT"
+          echo "📜 Format check successful"
 
   build_image:
     name: Build and Push Image
@@ -107,8 +116,8 @@ jobs:
 
   compile_check:
     name: Compile Check
-    needs: [detect_changes, build_image]
-    if: needs.detect_changes.outputs.compile_needed == 'true'
+    needs: [detect_changes, build_image, format_check]
+    if: needs.detect_changes.outputs.compile_needed == 'true' && needs.format_check.outputs.format_ok == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Log in to GHCR
