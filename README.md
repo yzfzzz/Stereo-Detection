@@ -81,7 +81,24 @@ make -j$(nproc)
 
 6. 构建 Docker 镜像（推荐）：
 
-如果你希望在容器中运行项目，可以使用仓库根目录的 Dockerfile 构建镜像：
+- 如果你希望在容器中运行项目，可以使用仓库根目录的 Dockerfile 构建镜像（以 Win11 为例，注意 Dockerfile 需拉取对应版本的镜像）：
+
+```bash
+# 驱动版本建议保持一致，其他版本自行查询 NVIDIA 官网
+root@f9a6dd113c50:/home/work/depth-detect# nvidia-smi
+Sun May 24 13:42:29 2026
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 573.22                 Driver Version: 573.22         CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                  Driver-Model | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+
+root@f9a6dd113c50:/home/work/Stereo-Detection# cat Dockerfile 
+# CUDA Version: 12.8，Driver Version: 573.22对应的基础镜像
+FROM nvcr.io/nvidia/tensorrt:25.04-py3
+```
 
 ```bash
 # 在仓库根目录运行
@@ -93,7 +110,7 @@ xhost +local:root
 docker run --gpus all -it --restart=unless-stopped --name depth_detect  -v ./work:/home/work  -e DISPLAY=host.docker.internal:0.0  depth-detect:latest
 ```
 
-镜像内的构建与运行（容器内示例）：
+- 镜像内的构建与运行（容器内示例）：
 
 ```bash
 mkdir -p build && cd build
