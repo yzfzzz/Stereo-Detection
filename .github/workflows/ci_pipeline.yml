@@ -1,0 +1,145 @@
+name: 🚀 CI Pipeline Compile Check
+
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/**'
+      - 'cpp/**'
+    branches: [ main, develop, V2.*, V1.*, feat/*, fixbug/* ]
+  pull_request:
+    branches: [ main, develop, V2.*, V1.* ]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/**'
+      - 'cpp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  detect_changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      build_needed: ${{ steps.filter.outputs.build }}
+      compile_needed: ${{ steps.filter.outputs.compile }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            build:
+              - 'Dockerfile'
+              - '.github/workflows/**'
+              - 'cpp/**'
+            compile:
+              - 'cpp/**'
+              - '.github/workflows/**'
+
+      - id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ref_name="${{ github.head_ref }}"
+            sha="${{ github.event.pull_request.head.sha }}"
+          else
+            ref_name="${{ github.ref_name }}"
+            sha="${{ github.sha }}"
+          fi
+          safe_ref=$(echo "$ref_name" | tr '/' '-')
+          echo "image_tag=${safe_ref}-${sha}" >> "$GITHUB_OUTPUT"
+
+  build_image:
+    name: Build and Push Image
+    needs: detect_changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: needs.detect_changes.outputs.build_needed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: needs.detect_changes.outputs.build_needed == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: needs.detect_changes.outputs.build_needed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ needs.detect_changes.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Skip build
+        if: needs.detect_changes.outputs.build_needed != 'true'
+        run: echo "No build-relevant changes, skip image build."
+
+  compile_check:
+    name: Compile Check
+    needs: [detect_changes, build_image]
+    if: needs.detect_changes.outputs.compile_needed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure image exists
+        id: pull_image
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}:${{ needs.detect_changes.outputs.image_tag }}
+          echo "Trying to pull $IMAGE"
+          if docker pull "$IMAGE"; then
+            echo "🐳 pulled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pulled=false" >> "$GITHUB_OUTPUT"
+            echo "Image $IMAGE not found. Failing compile_check." >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Run compile inside image
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}:${{ needs.detect_changes.outputs.image_tag }}
+          docker run --rm -v "${{ github.workspace }}":/work -w /work "$IMAGE" bash -lc "\
+            mkdir -p build && \
+            cd build && \
+            cmake -DCMAKE_BUILD_TYPE=Release .. && \
+            make -j\$(nproc) \
+            echo "✅ Compilation successful"
+          "
+      - name: List build artifacts
+        run: |
+          echo "Built files in bin/:"
+          ls -lh bin/ 2>/dev/null || echo "bin/ directory not found"
+          echo "✅ Listing successful"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: depth-detect-build
+          path: bin/
+          retention-days: 7
