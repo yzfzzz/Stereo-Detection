@@ -1,0 +1,15 @@
+build/
+.vscode/
+*.pth
+*.pt
+*.onnx
+*.onnx.data
+*.engine
+cpp/detect/images
+data/
+/python/__pycache__
+/bin/*
+/.cache
+/.claude
+/.github/skills
+/model
