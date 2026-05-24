@@ -112,7 +112,7 @@ jobs:
             echo "🐳 pulled=true" >> "$GITHUB_OUTPUT"
           else
             echo "pulled=false" >> "$GITHUB_OUTPUT"
-            echo "Image $IMAGE not found. Failing compile_check." >&2
+            echo "🐳 Image $IMAGE not found. Failing compile_check." >&2
             exit 1
           fi
 
@@ -128,14 +128,14 @@ jobs:
             mkdir -p build && \
             cd build && \
             cmake -DCMAKE_BUILD_TYPE=Release .. && \
-            make -j\$(nproc) \
+            make -j\$(nproc) && \
             echo "✅ Compilation successful"
           "
       - name: List build artifacts
         run: |
           echo "Built files in bin/:"
           ls -lh bin/ 2>/dev/null || echo "bin/ directory not found"
-          echo "✅ Listing successful"
+          echo "🤖 Listing successful"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
