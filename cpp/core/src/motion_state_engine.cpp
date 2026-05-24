@@ -120,7 +120,7 @@ float MotionStateEngine::getObjectDepth(cv::Mat depth, const STrack & track, cv:
         return 0.0f;
     }
 
-    const std::vector<float> & tlwh        = track.tlwh;
+    const std::vector<float> & tlwh        = track.tlwh_;
     float                      depth_value = 0.0f;
 
     depth_value = computeMeanDepth(depth, tlwh);

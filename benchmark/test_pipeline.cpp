@@ -19,8 +19,8 @@ class PipelineBenchmark : public benchmark::Fixture {
         if (!cap.isOpened()) {
             throw std::runtime_error("Failed to open video");
         }
-        frame_meta = FrameMeta(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT), cap.get(CAP_PROP_FPS),
-                               FrameSource::VIDEO);
+        frame_meta = FrameMeta(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT),
+                               cap.get(cv::CAP_PROP_FPS), FrameSource::VIDEO);
         pipeline   = std::make_unique<Pipeline>(config_manager, frame_meta);
 
         // Warmup: 跑 5 帧让 GPU 预热
@@ -84,7 +84,7 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, YoloOnlyInferenceAsync)(benchmark::State &
 
         // 仅调用 YOLO 推理（包含预处理 + TRT + CUDA NMS kernel），无后处理
         pipeline->getDetector().inferenceAsync(frame_input_context.raw_img);
-        pipeline->getDetector().WaitAsync();  // 同步等待推理完成
+        pipeline->getDetector().waitAsync();  // 同步等待推理完成
     }
     state.SetItemsProcessed(state.iterations());
 }
@@ -100,8 +100,8 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, DepthOnlyInferenceAsync)(benchmark::State 
         num_frames++;
 
         // 仅调用 Depth 推理（包含预处理 + TRT），无后处理
-        pipeline->getDepthModel()->PredictAsync(frame_input_context.raw_img);
-        pipeline->getDepthModel()->WaitAsync();  // 同步等待推理完成
+        pipeline->getDepthModel()->predictAsync(frame_input_context.raw_img);
+        pipeline->getDepthModel()->waitAsync();  // 同步等待推理完成
     }
     state.SetItemsProcessed(state.iterations());
 }
@@ -120,12 +120,12 @@ BENCHMARK_DEFINE_F(PipelineBenchmark, PostProcess)(benchmark::State & state) {
 
     // 2. 执行一次完整的异步推理，获取真实的 Detections 结果
     pipeline->getDetector().inferenceAsync(fixed_input.raw_img);
-    pipeline->getDepthModel()->PredictAsync(fixed_input.raw_img);
-    pipeline->getDepthModel()->WaitAsync();
-    pipeline->getDetector().WaitAsync();
-    fixed_detections = pipeline->getDetector().GetInferResultAsync(fixed_input.raw_img);
+    pipeline->getDepthModel()->predictAsync(fixed_input.raw_img);
+    pipeline->getDepthModel()->waitAsync();
+    pipeline->getDetector().waitAsync();
+    fixed_detections = pipeline->getDetector().getInferResultAsync(fixed_input.raw_img);
 
-    auto depth_result         = pipeline->getDepthModel()->GetPredictResultAsync();
+    auto depth_result         = pipeline->getDepthModel()->getPredictResultAsync();
     fixed_output.result_depth = depth_result.first;
     fixed_output.depth_vis    = depth_result.second;
 

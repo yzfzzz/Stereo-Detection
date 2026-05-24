@@ -3,8 +3,6 @@
 #include "config.h"
 #include "config_manager.h"
 
-#include <experimental/filesystem>
-
 // 全局鼠标回调函数
 void onMouse(int event, int x, int y, int flags, void * userdata) {
     DisplayManager * dm = static_cast<DisplayManager *>(userdata);
@@ -111,15 +109,15 @@ float DisplayManager::computeMeanDepth(const std::vector<float> & tlwh) const {
 }
 
 void DisplayManager::printTargetInfo(const STrack & track) const {
-    int                        class_id = track.class_id;
-    int                        track_id = track.track_id;
-    const std::vector<float> & tlwh     = track.tlwh;
+    int                        class_id = track.class_id_;
+    int                        track_id = track.track_id_;
+    const std::vector<float> & tlwh     = track.tlwh_;
 
     // 使用多点采样计算深度均值
     float depth = computeMeanDepth(tlwh);
 
     std::cout << "\n=== Target Info ===" << std::endl;
-    std::cout << "Class: " << vClassNames[class_id] << std::endl;
+    std::cout << "Class: " << V_CLASS_NAMES[class_id] << std::endl;
     std::cout << "Track ID: " << track_id << std::endl;
     std::cout << "Depth (mean of 25 samples): " << depth << std::endl;
     std::cout << "BBox: [" << tlwh[0] << ", " << tlwh[1] << ", " << tlwh[0] + tlwh[2] << ", " << tlwh[1] + tlwh[3]
@@ -129,7 +127,7 @@ void DisplayManager::printTargetInfo(const STrack & track) const {
 
 void DisplayManager::handleMouseClick(int x, int y) {
     for (const auto & track : tracks_) {
-        const std::vector<float> & tlwh   = track.tlwh;
+        const std::vector<float> & tlwh   = track.tlwh_;
         float                      left   = tlwh[0];
         float                      top    = tlwh[1];
         float                      right  = tlwh[0] + tlwh[2];
@@ -193,13 +191,13 @@ int DisplayManager::waitKey(int delay) {
 
 DrawingManager::DrawingManager(const std::vector<std::string> & class_names) : vClassNames_(class_names) {}
 
-void DrawingManager::drawTrackedObject(cv::Mat &               img,
+void DrawingManager::drawTrackedObject(cv::Mat &                     img,
                                        const STrack &                track,
                                        const MotionStateInfoRecord & motion_state,
                                        cv::Scalar                    color) {
-    const std::vector<float> & tlwh     = track.tlwh;
-    int                        class_id = track.class_id;
-    int                        track_id = track.track_id;
+    const std::vector<float> & tlwh     = track.tlwh_;
+    int                        class_id = track.class_id_;
+    int                        track_id = track.track_id_;
 
     // 1. 获取运动状态字符串
     auto        it               = MOTION_STR_MAP.find({ motion_state.state_vec, motion_state.state_acc });

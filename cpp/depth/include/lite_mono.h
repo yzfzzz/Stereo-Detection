@@ -6,5 +6,5 @@ class LiteMono : public BaseDepthModel {
     LiteMono()           = default;
     ~LiteMono() override = default;
 
-    std::vector<float> Preprocess(const cv::Mat & image) override;
+    std::vector<float> preProcess(const cv::Mat & image) override;
 };

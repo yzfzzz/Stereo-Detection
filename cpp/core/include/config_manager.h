@@ -19,9 +19,9 @@ class ConfigManager {
 
     std::string getOutDir() const;
 
-    bool  isDisplayEnabled() const;
-    bool  isSaveEnabled() const;
-    
+    bool isDisplayEnabled() const;
+    bool isSaveEnabled() const;
+
     float getMotionVelocityThreshold() const;
     float getMotionAccelerationThreshold() const;
 
@@ -31,20 +31,20 @@ class ConfigManager {
     float getKfMeasurementNoiseCov() const;
 
   private:
-    YAML::Node  config;
-    std::string yolo_trt_file;
-    std::string depth_trt_file;
-    std::string save_mode;
-    std::string out_dir;
-    int         depth_interval;
-    bool        is_display;
-    bool        is_save;
-    
-    float       motion_velocity_threshold;
-    float       motion_acceleration_threshold;
-    
-    float yolo_nms_thresh;
-    float yolo_conf_thresh;
-    float kf_process_noise_cov;
-    float kf_measurement_noise_cov;
+    YAML::Node  config_;
+    std::string yolo_trt_file_;
+    std::string depth_trt_file_;
+    std::string save_mode_;
+    std::string out_dir_;
+    int         depth_interval_;
+    bool        is_display_;
+    bool        is_save_;
+
+    float motion_velocity_threshold_;
+    float motion_acceleration_threshold_;
+
+    float yolo_nms_thresh_;
+    float yolo_conf_thresh_;
+    float kf_process_noise_cov_;
+    float kf_measurement_noise_cov_;
 };

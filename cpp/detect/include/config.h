@@ -4,28 +4,28 @@
 #include <string>
 #include <vector>
 
-const int kGpuId    = 0;
-const int kNumClass = 80;
+const int GPU_ID    = 0;
+const int NUM_CLASS = 80;
 
-const float kNmsThresh        = 0.45f;
-const float kConfThresh       = 0.25f;
-const int   kMaxNumOutputBbox = 1000;  // assume the box outputs no more than kMaxNumOutputBbox boxes that
-                                       // conf >= kNmsThresh;
-const int   kNumBoxElement    = 7;     // left, top, right, bottom, confidence, class,
-                                       // keepflag(whether drop when NMS)
+const float NMS_THRESH          = 0.45f;
+const float CONF_THRESH         = 0.25f;
+const int   MAX_NUM_OUTPUT_BBOX = 1000;  // assume the box outputs no more than MAX_NUM_OUTPUT_BBOX boxes that
+                                         // conf >= NMS_THRESH;
+const int   NUM_BOX_ELEMENT     = 7;     // left, top, right, bottom, confidence, class,
+                                         // keepflag(whether drop when NMS)
 
-const std::string onnxFile = "../onnx_model/yolov8s.onnx";
+const std::string ONNX_FILE = "../onnx_model/yolov8s.onnx";
 // const std::string trtFile = "./yolov8s.plan";
 // const std::string testDataDir = "../images";  // 用于推理
 
 // for FP16 mode
-const bool        bFP16Mode           = false;
+const bool        B_FP16_MODE           = false;
 // for INT8 mode
-const bool        bINT8Mode           = false;
-const std::string cacheFile           = "./int8.cache";
-const std::string calibrationDataPath = "../calibrator";  // 存放用于 int8 量化校准的图像
+const bool        B_INT8_MODE           = false;
+const std::string CACHE_FILE            = "./int8.cache";
+const std::string CALIBRATION_DATA_PATH = "../calibrator";  // 存放用于 int8 量化校准的图像
 
-const std::vector<std::string> vClassNames{
+const std::vector<std::string> V_CLASS_NAMES{
     "person",         "bicycle",    "car",           "motorcycle",    "airplane",     "bus",           "train",
     "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",    "parking meter", "bench",
     "bird",           "cat",        "dog",           "horse",         "sheep",        "cow",           "elephant",

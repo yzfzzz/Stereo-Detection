@@ -63,9 +63,9 @@ void bind_yolo_detector(py::module & m) {
 // ==================== 绑定 depth深度检测模型 ====================
 void bind_depth_models(py::module & m) {
     py::class_<BaseDepthModel, std::shared_ptr<BaseDepthModel>>(m, "BaseDepthModel")
-        .def("init", &BaseDepthModel::Init, py::arg("engine_path"),
+        .def("init", &BaseDepthModel::init, py::arg("engine_path"),
              "Initialize the depth model with the given engine path")
-        .def("predict", &BaseDepthModel::Predict, py::arg("image"), "Run depth prediction");
+        .def("predict", &BaseDepthModel::predict, py::arg("image"), "Run depth prediction");
 
     py::class_<DepthAnything, BaseDepthModel, std::shared_ptr<DepthAnything>>(m, "DepthAnything").def(py::init<>());
 
@@ -110,11 +110,11 @@ void bind_byte_tracker(py::module & m) {
 
     // STrack
     py::class_<STrack>(m, "STrack")
-        .def_readonly("tlwh", &STrack::tlwh)
-        .def_readonly("track_id", &STrack::track_id)
-        .def_readonly("class_id", &STrack::class_id)
-        .def_readonly("score", &STrack::score)
-        .def_readonly("is_activated", &STrack::is_activated);
+        .def_readonly("tlwh", &STrack::tlwh_)
+        .def_readonly("track_id", &STrack::track_id_)
+        .def_readonly("class_id", &STrack::class_id_)
+        .def_readonly("score", &STrack::score_)
+        .def_readonly("is_activated", &STrack::is_activated_);
 
     // BYTETracker
     py::class_<BYTETracker>(m, "BYTETracker")

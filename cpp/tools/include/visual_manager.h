@@ -13,7 +13,7 @@
 class DisplayManager;
 
 // 全局变量声明（来自 config.h）
-extern const std::vector<std::string> vClassNames;
+extern const std::vector<std::string> V_CLASS_NAMES;
 
 enum Key_Input {
     ESC   = 27,
