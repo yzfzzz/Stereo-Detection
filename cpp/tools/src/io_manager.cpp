@@ -20,7 +20,8 @@ IOManager::IOManager(ConfigManager & config_manager, int fps, int img_width, int
                            cv::Size(img_width, img_height));
 
         if (!video_writer_.isOpened()) {
-            std::cerr << "[Error] Failed to initialize VideoWriter at " << video_save_path << std::endl;
+            std::cerr << "[Error] Failed to initialize VideoWriter at " << video_save_path
+                      << std::endl;
         }
     }
 }

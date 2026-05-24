@@ -61,4 +61,4 @@ void normalize_colormap_resize(float *      src,
 
 void initColorMapTable();  // init color map table
 
-#endif  // POSTPROCESS_H
+#endif                     // POSTPROCESS_H

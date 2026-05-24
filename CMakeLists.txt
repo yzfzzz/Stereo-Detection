@@ -16,6 +16,12 @@ if(ENABLE_TIMER)
     add_definitions(-DENABLE_TIMER)
 endif()
 
+option(ENABLE_JESTON_MEM_MANAGED "Enable Jetson memory managed" OFF)
+if(ENABLE_JESTON_MEM_MANAGED)
+    message(STATUS "Enabling Jetson memory managed")
+    add_definitions(-DENABLE_JESTON_MEM_MANAGED)
+endif()
+
 # ==================== Platform Detect ====================
 # 可选值: AUTO / NANO2GB / TX2 / X86_64
 set(TARGET_PLATFORM "AUTO" CACHE STRING "Build target platform")
@@ -201,6 +207,15 @@ if(ENABLE_BENCHMARK)
         core bytetrack yolo_infer depth tools yaml-cpp benchmark::benchmark
     )
     message(STATUS "Registered benchmark: test_depth_preprocess")
+    # test jetson memory management benchmark
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+      add_executable(test_jeston_mem_manager ${BENCHMARK_SRCS}/test_jeston_mem_manager.cpp)
+      target_link_libraries(test_jeston_mem_manager PRIVATE
+          core bytetrack yolo_infer depth tools yaml-cpp benchmark::benchmark
+      )
+      message(STATUS "Registered benchmark: test_jeston_mem_manager")
+    endif()
+    
 
 else()
   message(STATUS "ENABLE_BENCHMARK=OFF")

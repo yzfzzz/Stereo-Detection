@@ -12,39 +12,38 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-#define CHECK_CUDA(call)                                                                                        \
-    do {                                                                                                        \
-        cudaError_t status = call;                                                                              \
-        if (status != cudaSuccess) {                                                                            \
-            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " << cudaGetErrorString(status) \
-                      << std::endl;                                                                             \
-            exit(EXIT_FAILURE);                                                                                 \
-        }                                                                                                       \
+#define CHECK_CUDA(call)                                                          \
+    do {                                                                          \
+        cudaError_t status = call;                                                \
+        if (status != cudaSuccess) {                                              \
+            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " \
+                      << cudaGetErrorString(status) << std::endl;                 \
+            exit(EXIT_FAILURE);                                                   \
+        }                                                                         \
     } while (0)
 
-using namespace nvinfer1;
-
-class Logger : public ILogger {
+class Logger : public nvinfer1::ILogger {
   public:
-    Severity reportableSeverity;
+    nvinfer1::ILogger::Severity reportable_severity_;
 
-    Logger(Severity severity = Severity::kINFO) : reportableSeverity(severity) {}
+    Logger(nvinfer1::ILogger::Severity severity = nvinfer1::ILogger::Severity::kINFO) :
+        reportable_severity_(severity) {}
 
-    void log(Severity severity, const char * msg) noexcept override {
-        if (severity > reportableSeverity) {
+    void log(nvinfer1::ILogger::Severity severity, const char * msg) noexcept override {
+        if (severity > reportable_severity_) {
             return;
         }
         switch (severity) {
-            case Severity::kINTERNAL_ERROR:
+            case nvinfer1::ILogger::Severity::kINTERNAL_ERROR:
                 std::cerr << "INTERNAL_ERROR: ";
                 break;
-            case Severity::kERROR:
+            case nvinfer1::ILogger::Severity::kERROR:
                 std::cerr << "ERROR: ";
                 break;
-            case Severity::kWARNING:
+            case nvinfer1::ILogger::Severity::kWARNING:
                 std::cerr << "WARNING: ";
                 break;
-            case Severity::kINFO:
+            case nvinfer1::ILogger::Severity::kINFO:
                 std::cerr << "INFO: ";
                 break;
             default:
