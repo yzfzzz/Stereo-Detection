@@ -136,7 +136,15 @@ void YoloDetectModel::getEngine() {
 }
 
 YoloDetectModel::~YoloDetectModel() {
-    cudaStreamDestroy(stream_);
+    context_.reset();
+    engine_.reset();
+    runtime_.reset();
+
+    if (stream_ != 0) {
+        cudaStreamSynchronize(stream_);
+        cudaStreamDestroy(stream_);
+        stream_ = 0;
+    }
 }
 
 std::vector<Detection> YoloDetectModel::inference(const cv::Mat & img) {

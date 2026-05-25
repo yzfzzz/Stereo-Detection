@@ -14,7 +14,16 @@
 DepthModel::DepthModel() : stream_(0), input_h_(0), input_w_(0) {}
 
 DepthModel::~DepthModel() {
-    cudaStreamDestroy(stream_);
+    context_.reset();
+    engine_.reset();
+    runtime_.reset();
+
+    // 确保所有在 stream_ 上的 CUDA 工作完成
+    if (stream_ != 0) {
+        cudaStreamSynchronize(stream_);
+        cudaStreamDestroy(stream_);
+        stream_ = 0;
+    }
 }
 
 void DepthModel::init(const std::string & engine_path, int img_w, int img_h, bool is_normalize) {
