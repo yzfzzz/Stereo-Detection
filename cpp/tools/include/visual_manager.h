@@ -13,7 +13,6 @@
 // 前向声明
 class DisplayManager;
 
-
 enum Key_Input {
     ESC   = 27,
     SPACE = 32,
