@@ -1,4 +1,4 @@
-#include "base.h"
+#include "depth_model.h"
 #include "postprocess.h"
 #include "preprocess.h"
 #include "public.h"
@@ -11,7 +11,7 @@
 #include <iostream>
 #include <memory>
 
-BaseDepthModel::BaseDepthModel() :
+DepthModel::DepthModel() :
     runtime_(nullptr),
     engine_(nullptr),
     context_(nullptr),
@@ -20,7 +20,7 @@ BaseDepthModel::BaseDepthModel() :
     input_w_(0),
     h_output_data_(nullptr) {}
 
-BaseDepthModel::~BaseDepthModel() {
+DepthModel::~DepthModel() {
     if (stream_) {
         cudaStreamDestroy(stream_);
     }
@@ -88,10 +88,19 @@ BaseDepthModel::~BaseDepthModel() {
 #endif
 }
 
-void BaseDepthModel::init(const std::string & engine_path, int img_w, int img_h) {
-    origin_img_h_ = img_h;
-    origin_img_w_ = img_w;
-    assert(origin_img_h_ > 0 && origin_img_w_ > 0 && "Invalid image dimensions");
+void DepthModel::init(const std::string & engine_path, int img_w, int img_h, bool is_normalize) {
+    raw_img_h_ = img_h;
+    raw_img_w_ = img_w;
+    assert(raw_img_h_ > 0 && raw_img_w_ > 0 && "Invalid image dimensions");
+
+    if (!is_normalize) {
+        h_mean_ = { 0, 0, 0 };
+        h_std_  = { 1.0f, 1.0f, 1.0f };
+    } else {
+        h_mean_ = { 0.485f, 0.456f, 0.406f };
+        h_std_  = { 0.229f, 0.224f, 0.225f };
+    }
+
     std::ifstream engineStream(engine_path, std::ios::binary);
     if (!engineStream.is_open()) {
         std::cerr << "Failed to open engine file: " << engine_path << std::endl;
@@ -139,10 +148,10 @@ void BaseDepthModel::init(const std::string & engine_path, int img_w, int img_h)
     cudaMalloc((void **) &d_depth_infer_max_value_, sizeof(float));
     cudaMalloc((void **) &d_mean_, 3 * sizeof(float));
     cudaMalloc((void **) &d_std_, 3 * sizeof(float));
-    cudaMemcpy(d_mean_, h_mean_, 3 * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_std_, h_std_, 3 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mean_, h_mean_.data(), 3 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_std_, h_std_.data(), 3 * sizeof(float), cudaMemcpyHostToDevice);
     CHECK_CUDA(cudaMalloc((void **) &d_before_preprocess_img_data_,
-                          3 * origin_img_h_ * origin_img_w_ * sizeof(uchar)));
+                          3 * raw_img_h_ * raw_img_w_ * sizeof(uchar)));
 
     // 查询 CUB 所需临时显存大小
     cub::DeviceReduce::Min(nullptr, cub_min_bytes_, (float *) d_buffer_[1],
@@ -161,21 +170,42 @@ void BaseDepthModel::init(const std::string & engine_path, int img_w, int img_h)
     context_->setTensorAddress(io_tensor_name_[1].c_str(), d_buffer_[1]);
 #endif
 
-    h_depth_output_data_   = new uchar[origin_img_h_ * origin_img_w_];
-    h_depth_colormap_data_ = new uchar3[origin_img_h_ * origin_img_w_];
+    h_depth_output_data_   = new uchar[raw_img_h_ * raw_img_w_];
+    h_depth_colormap_data_ = new uchar3[raw_img_h_ * raw_img_w_];
 #if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
     // Jeston 上使用统一内存
-    cudaMallocManaged(&d_buffer_dst_depth_, origin_img_h_ * origin_img_w_ * sizeof(uchar));
-    cudaMallocManaged(&d_buffer_dst_colormap_, origin_img_h_ * origin_img_w_ * sizeof(uchar3));
+    cudaMallocManaged(&d_buffer_dst_depth_, raw_img_h_ * raw_img_w_ * sizeof(uchar));
+    cudaMallocManaged(&d_buffer_dst_colormap_, raw_img_h_ * raw_img_w_ * sizeof(uchar3));
 #else
-    cudaMalloc((void **) &d_buffer_dst_depth_, origin_img_h_ * origin_img_w_ * sizeof(uchar));
-    cudaMalloc((void **) &d_buffer_dst_colormap_, origin_img_h_ * origin_img_w_ * sizeof(uchar3));
+    cudaMalloc((void **) &d_buffer_dst_depth_, raw_img_h_ * raw_img_w_ * sizeof(uchar));
+    cudaMalloc((void **) &d_buffer_dst_colormap_, raw_img_h_ * raw_img_w_ * sizeof(uchar3));
 #endif
 
     initColorMapTable();
 }
 
-std::pair<cv::Mat, cv::Mat> BaseDepthModel::predict(const cv::Mat & image) {
+std::vector<float> DepthModel::preProcess(const cv::Mat & image) {
+    raw_img_w_ = image.cols;
+    raw_img_h_ = image.rows;
+    // 自定义的 resize_depth (假设你在其他地方定义了它)
+    cv::Mat resized_image, rgb;  // std::get<0>(resize_depth(image, input_w, input_h));
+    cv::resize(image, resized_image, cv::Size(input_w_, input_h_));
+    cv::cvtColor(resized_image, rgb, cv::COLOR_BGR2RGB);
+
+    std::vector<float> input_tensor;
+
+    for (int k = 0; k < 3; k++) {
+        for (int i = 0; i < resized_image.rows; i++) {
+            for (int j = 0; j < resized_image.cols; j++) {
+                input_tensor.emplace_back(
+                    ((float) rgb.at<cv::Vec3b>(i, j)[k] / 255.0f - h_mean_[k]) / h_std_[k]);
+            }
+        }
+    }
+    return input_tensor;
+}
+
+std::pair<cv::Mat, cv::Mat> DepthModel::predict(const cv::Mat & image) {
     std::vector<float> input = preProcess(image);
     cudaMemcpy(d_buffer_[0], input.data(), 3 * input_h_ * input_w_ * sizeof(float),
                cudaMemcpyHostToDevice);
@@ -193,11 +223,11 @@ std::pair<cv::Mat, cv::Mat> BaseDepthModel::predict(const cv::Mat & image) {
 
     cv::Mat colormap;
     cv::applyColorMap(depth_mat, colormap, cv::COLORMAP_INFERNO);
-    cv::resize(colormap, colormap, cv::Size(origin_img_w_, origin_img_h_));
+    cv::resize(colormap, colormap, cv::Size(raw_img_w_, raw_img_h_));
     return std::make_pair(depth_mat, colormap);
 }
 
-void BaseDepthModel::predictAsync(const cv::Mat & image) {
+void DepthModel::predictAsync(const cv::Mat & image) {
     // 数据异步拷贝至 GPU, 并进行 cuda 前处理
     preProcessAsync(image);
 
@@ -220,32 +250,32 @@ void BaseDepthModel::predictAsync(const cv::Mat & image) {
 
     normalize_colormap_resize((float *) d_buffer_[1], d_buffer_norm_depth_, d_buffer_norm_colormap_,
                               d_buffer_dst_depth_, d_buffer_dst_colormap_, d_depth_infer_min_value_,
-                              d_depth_infer_max_value_, input_w_, input_h_, origin_img_w_,
-                              origin_img_h_, stream_);
+                              d_depth_infer_max_value_, input_w_, input_h_, raw_img_w_, raw_img_h_,
+                              stream_);
 
     CHECK_CUDA(cudaMemcpyAsync(h_depth_output_data_, d_buffer_dst_depth_,
-                               origin_img_h_ * origin_img_w_ * sizeof(uchar),
-                               cudaMemcpyDeviceToHost, stream_));
+                               raw_img_h_ * raw_img_w_ * sizeof(uchar), cudaMemcpyDeviceToHost,
+                               stream_));
     CHECK_CUDA(cudaMemcpyAsync(h_depth_colormap_data_, d_buffer_dst_colormap_,
-                               origin_img_h_ * origin_img_w_ * sizeof(uchar3),
-                               cudaMemcpyDeviceToHost, stream_));
+                               raw_img_h_ * raw_img_w_ * sizeof(uchar3), cudaMemcpyDeviceToHost,
+                               stream_));
 }
 
-void BaseDepthModel::waitAsync() {
+void DepthModel::waitAsync() {
     CHECK_CUDA(cudaStreamSynchronize(stream_));
 }
 
-std::pair<cv::Mat, cv::Mat> BaseDepthModel::getPredictResultAsync() {
-    auto depth_output   = cv::Mat(origin_img_h_, origin_img_w_, CV_8UC1, h_depth_output_data_);
-    auto depth_colormap = cv::Mat(origin_img_h_, origin_img_w_, CV_8UC3, h_depth_colormap_data_);
+std::pair<cv::Mat, cv::Mat> DepthModel::getPredictResultAsync() {
+    auto depth_output   = cv::Mat(raw_img_h_, raw_img_w_, CV_8UC1, h_depth_output_data_);
+    auto depth_colormap = cv::Mat(raw_img_h_, raw_img_w_, CV_8UC3, h_depth_colormap_data_);
     std::pair<cv::Mat, cv::Mat> result = std::make_pair(depth_output, depth_colormap);
     return result;
 }
 
-void BaseDepthModel::preProcessAsync(const cv::Mat & image) {
+void DepthModel::preProcessAsync(const cv::Mat & image) {
     CHECK_CUDA(cudaMemcpyAsync(d_before_preprocess_img_data_, image.data,
-                               3 * origin_img_h_ * origin_img_w_ * sizeof(uchar),
-                               cudaMemcpyHostToDevice, stream_));
-    depthPreprocess(d_before_preprocess_img_data_, (float *) d_buffer_[0], origin_img_w_,
-                    origin_img_h_, input_w_, input_h_, d_mean_, d_std_, stream_);
+                               3 * raw_img_h_ * raw_img_w_ * sizeof(uchar), cudaMemcpyHostToDevice,
+                               stream_));
+    depthPreprocess(d_before_preprocess_img_data_, (float *) d_buffer_[0], raw_img_w_, raw_img_h_,
+                    input_w_, input_h_, d_mean_, d_std_, stream_);
 }

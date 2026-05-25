@@ -3,24 +3,29 @@
 
 #include "config.h"
 #include "public.h"
-#include "types.h"
 
 #include <opencv2/opencv.hpp>
 
-class YoloDetector {
+struct Detection {
+    // x1, y1, x2, y2
+    std::array<float, 4> bbox;
+    float                conf;
+    int                  classId;
+};
+
+class YoloDetectModel {
   public:
-    YoloDetector(const std::string trtFile,
-                 int               raw_img_w,
-                 int               raw_img_h,
-                 int               gpuId      = GPU_ID,
-                 float             nmsThresh  = NMS_THRESH,
-                 float             confThresh = CONF_THRESH,
-                 int               numClass   = NUM_CLASS);
-    ~YoloDetector();
+    YoloDetectModel(const std::string trtFile,
+                    int               raw_img_w,
+                    int               raw_img_h,
+                    int               gpuId      = GPU_ID,
+                    float             nmsThresh  = NMS_THRESH,
+                    float             confThresh = CONF_THRESH,
+                    int               numClass   = NUM_CLASS);
+    ~YoloDetectModel();
     std::vector<Detection> inference(const cv::Mat & img);
     void                   inferenceAsync(const cv::Mat & img);
     std::vector<Detection> postProcess(float * output_data, const cv::Mat & img);
-    static void            drawImage(cv::Mat & img, std::vector<Detection> & infer_result);
 
     void waitAsync();
 

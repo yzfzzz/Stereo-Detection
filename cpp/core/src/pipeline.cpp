@@ -2,12 +2,8 @@
 
 #include "BYTETracker.h"
 #include "config_manager.h"
-#include "depth_anything.h"
 #include "frame.h"
-#include "lite_mono.h"
 #include "motion_state_engine.h"
-
-#include <memory>
 
 Pipeline::Pipeline(ConfigManager config_manager, FrameMeta frame_meta) :
     config_manager_(config_manager),
@@ -21,12 +17,14 @@ Pipeline::Pipeline(ConfigManager config_manager, FrameMeta frame_meta) :
                          config_manager_.getMotionAccelerationThreshold(),
                          config_manager_.getKfProcessNoiseCov(),
                          config_manager_.getKfMeasurementNoiseCov()) {
+    bool is_normalize = false;
     if (config_manager_.getDepthEnginePath().find("depth_anything") != std::string::npos) {
-        depth_model_ = std::make_unique<DepthAnything>();
+        is_normalize = true;
     } else if (config_manager_.getDepthEnginePath().find("lite") != std::string::npos) {
-        depth_model_ = std::make_unique<LiteMono>();
+        is_normalize = false;
     }
-    depth_model_->init(config_manager_.getDepthEnginePath(), frame_meta.img_w, frame_meta.img_h);
+    depth_model_.init(config_manager_.getDepthEnginePath(), frame_meta.img_w, frame_meta.img_h,
+                      is_normalize);
 }
 
 // 同步
@@ -36,7 +34,7 @@ void Pipeline::process(FrameInputContext &  frame_input_context,
                     ((frame_input_context.frame_id - 1) % config_manager_.getDepthInterval() == 0);
 
     if (do_depth) {
-        auto depth_infer_result = depth_model_->predict(frame_input_context.raw_img);
+        auto depth_infer_result = depth_model_.predict(frame_input_context.raw_img);
 
         infer_output_context.result_depth = depth_infer_result.first;
         infer_output_context.depth_vis    = depth_infer_result.second;
@@ -50,20 +48,20 @@ void Pipeline::process(FrameInputContext &  frame_input_context,
     postProcess(frame_input_context, infer_output_context, res);
 }
 
-void Pipeline::processAsync(FrameInputContext &  frame_input_context,
-                            InferOutputContext & infer_output_context) {
+void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
+                              InferOutputContext & infer_output_context) {
     bool do_depth = (!has_cached_depth_) ||
                     ((frame_input_context.frame_id - 1) % config_manager_.getDepthInterval() == 0);
 
     if (do_depth) {
-        depth_model_->predictAsync(frame_input_context.raw_img);
+        depth_model_.predictAsync(frame_input_context.raw_img);
     }
     detector_.inferenceAsync(frame_input_context.raw_img);
 
-    depth_model_->waitAsync();
+    depth_model_.waitAsync();
     detector_.waitAsync();
     if (do_depth) {
-        auto depth_result                 = depth_model_->getPredictResultAsync();
+        auto depth_result                 = depth_model_.getPredictResultAsync();
         infer_output_context.result_depth = depth_result.first;
         infer_output_context.depth_vis    = depth_result.second;
     } else {

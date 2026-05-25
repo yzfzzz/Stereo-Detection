@@ -1,6 +1,5 @@
 #include "config_manager.h"
-#include "depth_anything.h"
-#include "lite_mono.h"
+#include "depth_model.h"
 #include "preprocess.h"
 
 #include <benchmark/benchmark.h>
@@ -11,10 +10,10 @@
 
 class PreprocessBenchmark : public benchmark::Fixture {
   public:
-    std::unique_ptr<BaseDepthModel> depth_model;
-    cv::VideoCapture                cap;
-    cv::Mat                         img;
-    int                             num_frames = 0;
+    DepthModel       depth_model;
+    cv::VideoCapture cap;
+    cv::Mat          img;
+    int              num_frames = 0;
 
     // GPU buffers
     uchar * gpu_src  = nullptr;
@@ -38,12 +37,13 @@ class PreprocessBenchmark : public benchmark::Fixture {
         raw_h = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
 
         // 初始化模型并获取实际的 input size
+        bool is_normalize = false;
         if (config_manager.getDepthEnginePath().find("depth_anything") != std::string::npos) {
-            depth_model = std::make_unique<DepthAnything>();
+            is_normalize = true;
         } else {
-            depth_model = std::make_unique<LiteMono>();
+            is_normalize = false;
         }
-        depth_model->init(config_manager.getDepthEnginePath(), raw_w, raw_h);
+        depth_model.init(config_manager.getDepthEnginePath(), raw_w, raw_h, is_normalize);
 
         // 创建 CUDA stream
         cudaStreamCreate(&stream);
@@ -53,10 +53,10 @@ class PreprocessBenchmark : public benchmark::Fixture {
         for (int i = 0; i < 20; ++i) {
             if (cap.read(img) && !img.empty()) {
                 // CPU warmup
-                auto out = depth_model->preProcess(img);
+                auto out = depth_model.preProcess(img);
 
                 // GPU warmup
-                depth_model->preProcessAsync(img);
+                depth_model.preProcessAsync(img);
                 cudaStreamSynchronize(stream);
             }
         }
@@ -78,7 +78,6 @@ class PreprocessBenchmark : public benchmark::Fixture {
         if (stream) {
             cudaStreamDestroy(stream);
         }
-        depth_model.reset();
         cap.release();
     }
 };
@@ -95,7 +94,7 @@ BENCHMARK_DEFINE_F(PreprocessBenchmark, CPU_Preprocess_With_Copy)(benchmark::Sta
         state.ResumeTiming();
 
         // CPU 前处理
-        std::vector<float> input = depth_model->preProcess(img);
+        std::vector<float> input = depth_model.preProcess(img);
 
         // 同步拷贝到 GPU（与原来的 Predict 一致）
         cudaMemcpy(gpu_dst, input.data(), 3 * model_h * model_w * sizeof(float),
@@ -117,7 +116,7 @@ BENCHMARK_DEFINE_F(PreprocessBenchmark, GPU_depthPreprocess)(benchmark::State & 
         num_frames++;
         state.ResumeTiming();
 
-        depth_model->preProcessAsync(img);
+        depth_model.preProcessAsync(img);
         // 等待 kernel 完成
         cudaStreamSynchronize(stream);
 
