@@ -20,11 +20,8 @@ struct TrtDeleter {
         if (p == nullptr) {
             return;
         }
-#if NV_TENSORRT_MAJOR < 10
-        p->destroy();
-#else
+
         delete p;
-#endif
     }
 };
 

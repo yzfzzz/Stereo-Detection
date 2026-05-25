@@ -18,12 +18,12 @@
 #include <utility>
 #include <vector>
 
-cv::Mat draw_one_frame(FrameInputContext &            frame_input_context,
-                       InferOutputContext &           infer_output_context,
-                       const ConfigManager &          config_manager,
-                       DrawingManager &               drawing_manager,
-                       std::function<cv::Scalar(int)> get_color_func,
-                       int                            total_us) {
+cv::Mat drawOneFrame(FrameInputContext &            frame_input_context,
+                     InferOutputContext &           infer_output_context,
+                     const ConfigManager &          config_manager,
+                     DrawingManager &               drawing_manager,
+                     std::function<cv::Scalar(int)> get_color_func,
+                     int                            total_us) {
     for (int i = 0; i < infer_output_context.tracked_objects.size(); i++) {
         auto & track = infer_output_context.tracked_objects[i];
         if (track.tlwh_[2] * track.tlwh_[3] <= 20) {
@@ -109,7 +109,7 @@ int run(char * video_path) {
         }
 
         // 画图
-        cv::Mat out_frame = draw_one_frame(
+        cv::Mat out_frame = drawOneFrame(
             frame_input_context, infer_output_context, config_manager, drawing_manager,
             [&pipeline](int idx) { return pipeline.getColor(idx); }, total_us);
         // 保存结果
