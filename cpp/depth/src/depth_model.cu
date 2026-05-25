@@ -69,50 +69,39 @@ void DepthModel::init(const std::string & engine_path, int img_w, int img_h, boo
 
     cudaStreamCreate(&stream_);
 
-    void * buffer0 = nullptr;
-    void * buffer1 = nullptr;
-    CHECK_CUDA(cudaMalloc(&buffer0, 3 * input_h_ * input_w_ * sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&buffer1, input_h_ * input_w_ * sizeof(float)));
-    d_buffer_[0].reset(buffer0);
-    d_buffer_[1].reset(buffer1);
+    auto alloc_cuda = [](size_t bytes) {
+        void * ptr = nullptr;
+        CHECK_CUDA(cudaMalloc(&ptr, bytes));
+        return ptr;
+    };
 
-    void * norm_depth        = nullptr;
-    void * norm_colormap     = nullptr;
-    void * depth_min         = nullptr;
-    void * depth_max         = nullptr;
-    void * mean              = nullptr;
-    void * std               = nullptr;
-    void * before_preprocess = nullptr;
-    CHECK_CUDA(cudaMalloc(&norm_depth, input_h_ * input_w_ * sizeof(uchar)));
-    CHECK_CUDA(cudaMalloc(&norm_colormap, input_h_ * input_w_ * sizeof(uchar3)));
-    CHECK_CUDA(cudaMalloc(&depth_min, sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&depth_max, sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&mean, 3 * sizeof(float)));
-    CHECK_CUDA(cudaMalloc(&std, 3 * sizeof(float)));
-    d_buffer_norm_depth_.reset(static_cast<uchar *>(norm_depth));
-    d_buffer_norm_colormap_.reset(static_cast<uchar3 *>(norm_colormap));
-    d_depth_infer_min_value_.reset(static_cast<float *>(depth_min));
-    d_depth_infer_max_value_.reset(static_cast<float *>(depth_max));
-    d_mean_.reset(static_cast<float *>(mean));
-    d_std_.reset(static_cast<float *>(std));
+    d_buffer_[0].reset(alloc_cuda(3 * input_h_ * input_w_ * sizeof(float)));
+    d_buffer_[1].reset(alloc_cuda(input_h_ * input_w_ * sizeof(float)));
+
+    d_buffer_norm_depth_.reset(
+        static_cast<uchar *>(alloc_cuda(input_h_ * input_w_ * sizeof(uchar))));
+    d_buffer_norm_colormap_.reset(
+        static_cast<uchar3 *>(alloc_cuda(input_h_ * input_w_ * sizeof(uchar3))));
+    d_depth_infer_min_value_.reset(static_cast<float *>(alloc_cuda(sizeof(float))));
+    d_depth_infer_max_value_.reset(static_cast<float *>(alloc_cuda(sizeof(float))));
+    d_mean_.reset(static_cast<float *>(alloc_cuda(3 * sizeof(float))));
+    d_std_.reset(static_cast<float *>(alloc_cuda(3 * sizeof(float))));
+
     CHECK_CUDA(
         cudaMemcpy(d_mean_.get(), h_mean_.data(), 3 * sizeof(float), cudaMemcpyHostToDevice));
     CHECK_CUDA(cudaMemcpy(d_std_.get(), h_std_.data(), 3 * sizeof(float), cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMalloc(&before_preprocess, 3 * raw_img_h_ * raw_img_w_ * sizeof(uchar)));
-    d_before_preprocess_img_data_.reset(static_cast<uchar *>(before_preprocess));
+
+    d_before_preprocess_img_data_.reset(
+        static_cast<uchar *>(alloc_cuda(3 * raw_img_h_ * raw_img_w_ * sizeof(uchar))));
 
     // 查询 CUB 所需临时显存大小
     cub::DeviceReduce::Min(nullptr, cub_min_bytes_, (float *) d_buffer_[1].get(),
                            d_depth_infer_min_value_.get(), input_h_ * input_w_, stream_);
     cub::DeviceReduce::Max(nullptr, cub_max_bytes_, (float *) d_buffer_[1].get(),
                            d_depth_infer_max_value_.get(), input_h_ * input_w_, stream_);
-    cub_bytes_         = std::max(cub_min_bytes_, cub_max_bytes_);
-    void * cub_mid_min = nullptr;
-    void * cub_mid_max = nullptr;
-    CHECK_CUDA(cudaMalloc(&cub_mid_min, cub_bytes_));
-    CHECK_CUDA(cudaMalloc(&cub_mid_max, cub_bytes_));
-    d_cub_mid_min_.reset(cub_mid_min);
-    d_cub_mid_max_.reset(cub_mid_max);
+    cub_bytes_ = std::max(cub_min_bytes_, cub_max_bytes_);
+    d_cub_mid_min_.reset(alloc_cuda(cub_bytes_));
+    d_cub_mid_max_.reset(alloc_cuda(cub_bytes_));
     h_output_data_.resize(input_h_ * input_w_);
 
 #if NV_TENSORRT_MAJOR >= 10
@@ -133,12 +122,10 @@ void DepthModel::init(const std::string & engine_path, int img_w, int img_h, boo
     d_buffer_dst_depth_.reset(static_cast<uchar *>(dst_depth));
     d_buffer_dst_colormap_.reset(static_cast<uchar3 *>(dst_colormap));
 #else
-    void * dst_depth    = nullptr;
-    void * dst_colormap = nullptr;
-    CHECK_CUDA(cudaMalloc(&dst_depth, raw_img_h_ * raw_img_w_ * sizeof(uchar)));
-    CHECK_CUDA(cudaMalloc(&dst_colormap, raw_img_h_ * raw_img_w_ * sizeof(uchar3)));
-    d_buffer_dst_depth_.reset(static_cast<uchar *>(dst_depth));
-    d_buffer_dst_colormap_.reset(static_cast<uchar3 *>(dst_colormap));
+    d_buffer_dst_depth_.reset(
+        static_cast<uchar *>(alloc_cuda(raw_img_h_ * raw_img_w_ * sizeof(uchar))));
+    d_buffer_dst_colormap_.reset(
+        static_cast<uchar3 *>(alloc_cuda(raw_img_h_ * raw_img_w_ * sizeof(uchar3))));
 #endif
 
     initColorMapTable();
