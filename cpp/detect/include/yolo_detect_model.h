@@ -28,7 +28,7 @@ class YoloDetectModel {
     ~YoloDetectModel();
     std::vector<Detection> inference(const cv::Mat & img);
     void                   inferenceAsync(const cv::Mat & img);
-    std::vector<Detection> postProcess(const float * output_data, const cv::Mat & img);
+    std::vector<Detection> postProcess(const cv::Mat & img);
 
     void waitAsync();
 

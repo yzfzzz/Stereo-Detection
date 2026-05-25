@@ -9,6 +9,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 YoloDetectModel::YoloDetectModel(const std::string trtFile,
                                  int               raw_img_w,
@@ -182,35 +183,35 @@ std::vector<Detection> YoloDetectModel::inference(const cv::Mat & img) {
                               cudaMemcpyDeviceToHost));
     }
 
-    return postProcess(h_output_data_.data(), img);
+    return postProcess(img);
 }
 
-std::vector<Detection> YoloDetectModel::postProcess(const float * outputData, const cv::Mat & img) {
+std::vector<Detection> YoloDetectModel::postProcess(const cv::Mat & img) {
     std::vector<Detection> vDetections;
     int                    count;
     if (!is_need_nms_) {
         count = std::min(yolo26_max_num_output_bbox_, MAX_NUM_OUTPUT_BBOX);
     } else {
-        count = std::min((int) outputData[0], MAX_NUM_OUTPUT_BBOX);
+        count = std::min((int) h_output_data_[0], MAX_NUM_OUTPUT_BBOX);
     }
     for (int i = 0; i < count; i++) {
         int       pos;
         Detection det;
         auto      get_effective_detection = [&]() {
-            memcpy(det.bbox.data(), &outputData[pos], 4 * sizeof(float));
-            det.conf    = outputData[pos + 4];
-            det.classId = (int) outputData[pos + 5];
+            memcpy(det.bbox.data(), &h_output_data_[pos], 4 * sizeof(float));
+            det.conf    = h_output_data_[pos + 4];
+            det.classId = (int) h_output_data_[pos + 5];
             vDetections.push_back(det);
         };
         if (!is_need_nms_) {
             pos = i * yolo26_num_box_element_;
-            if (outputData[pos + 4] > confThresh_) {
+            if (h_output_data_[pos + 4] > confThresh_) {
                 get_effective_detection();
             }
 
         } else {
             pos          = 1 + i * NUM_BOX_ELEMENT;
-            int keepFlag = (int) outputData[pos + 6];
+            int keepFlag = (int) h_output_data_[pos + 6];
             if (keepFlag == 1) {
                 get_effective_detection();
             }
@@ -277,5 +278,5 @@ void YoloDetectModel::waitAsync() {
 }
 
 std::vector<Detection> YoloDetectModel::getInferResultAsync(const cv::Mat & img) {
-    return postProcess(h_output_data_.data(), img);
+    return postProcess(img);
 }
