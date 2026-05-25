@@ -1,7 +1,6 @@
 #ifndef INFER_H
 #define INFER_H
 
-#include "config.h"
 #include "memory.h"
 #include "public.h"
 
@@ -21,10 +20,10 @@ class YoloDetectModel {
     YoloDetectModel(const std::string trtFile,
                     int               raw_img_w,
                     int               raw_img_h,
-                    int               gpuId      = GPU_ID,
-                    float             nmsThresh  = NMS_THRESH,
-                    float             confThresh = CONF_THRESH,
-                    int               numClass   = NUM_CLASS);
+                    int               gpuId      = 0,
+                    float             nmsThresh  = 0.45f,
+                    float             confThresh = 0.25f,
+                    int               numClass   = 80);
     ~YoloDetectModel();
     std::vector<Detection> inference(const cv::Mat & img);
     void                   inferenceAsync(const cv::Mat & img);
@@ -68,6 +67,10 @@ class YoloDetectModel {
     int input_w_;
     int raw_img_h_;
     int raw_img_w_;
+
+    // assume the box outputs no more than MAX_NUM_OUTPUT_BBOX boxes that conf >= NMS_THRESH;
+    const int MAX_NUM_OUTPUT_BBOX = 1000;
+    const int NUM_BOX_ELEMENT     = 7;
 };
 
 #endif  // INFER_H

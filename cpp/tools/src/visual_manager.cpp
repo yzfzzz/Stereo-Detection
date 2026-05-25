@@ -1,6 +1,5 @@
 #include "visual_manager.h"
 
-#include "config.h"
 #include "config_manager.h"
 
 // 全局鼠标回调函数

@@ -1,5 +1,4 @@
 
-#include "config.h"
 #include "config_manager.h"
 #include "frame.h"
 #include "io_manager.h"

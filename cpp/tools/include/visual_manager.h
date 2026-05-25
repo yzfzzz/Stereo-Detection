@@ -2,6 +2,7 @@
 
 #include "config_manager.h"
 #include "motion_state_engine.h"
+#include "public.h"
 #include "STrack.h"
 
 #include <opencv2/core/types.hpp>
@@ -12,8 +13,6 @@
 // 前向声明
 class DisplayManager;
 
-// 全局变量声明（来自 config.h）
-extern const std::vector<std::string> V_CLASS_NAMES;
 
 enum Key_Input {
     ESC   = 27,
