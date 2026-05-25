@@ -2,9 +2,12 @@
 #define INFER_H
 
 #include "config.h"
+#include "memory.h"
 #include "public.h"
 
+#include <array>
 #include <opencv2/opencv.hpp>
+#include <vector>
 
 struct Detection {
     // x1, y1, x2, y2
@@ -25,7 +28,7 @@ class YoloDetectModel {
     ~YoloDetectModel();
     std::vector<Detection> inference(const cv::Mat & img);
     void                   inferenceAsync(const cv::Mat & img);
-    std::vector<Detection> postProcess(float * output_data, const cv::Mat & img);
+    std::vector<Detection> postProcess(const float * output_data, const cv::Mat & img);
 
     void waitAsync();
 
@@ -42,19 +45,19 @@ class YoloDetectModel {
     float nmsThresh_;
     float confThresh_;
 
-    nvinfer1::ICudaEngine *       engine_;
-    nvinfer1::IRuntime *          runtime_;
-    nvinfer1::IExecutionContext * context_;
+    TrtEnginePtr  engine_;
+    TrtRuntimePtr runtime_;
+    TrtContextPtr context_;
 
     cudaStream_t stream_;
 
-    float *             h_output_data_;
-    std::vector<void *> d_buffer_;
-    float *             d_transpose_;
-    float *             d_decode_;
+    std::vector<float>                   h_output_data_;
+    std::array<unique_ptr_cuda<void>, 2> d_buffer_;
+    unique_ptr_cuda<float>               d_transpose_;
+    unique_ptr_cuda<float>               d_decode_;
     // preprocess
-    uchar *             d_src_data_;
-    uchar *             d_mid_data_;
+    unique_ptr_cuda<uchar>               d_src_data_;
+    unique_ptr_cuda<uchar>               d_mid_data_;
 
     int  OUTPUT_CANDIDATES_;           // 8400: 80 * 80 + 40 * 40 + 20 * 20
     int  yolo26_max_num_output_bbox_;  // 暂时用于yolo26，后续可以删除
