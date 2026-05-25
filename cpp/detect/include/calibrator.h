@@ -32,7 +32,7 @@ class Int8EntropyCalibrator2 : public nvinfer1::IInt8EntropyCalibrator2 {
     std::string              calib_table_name_;
     bool                     read_cache_;
     float *                  batch_data;
-    void *                   device_input_;
+    void *                   d_device_input_;
     std::vector<char>        calib_cache_;
 };
 

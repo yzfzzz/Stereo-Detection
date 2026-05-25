@@ -43,13 +43,13 @@ class YoloDetector {
 
     cudaStream_t stream_;
 
-    float *             output_data_;
-    std::vector<void *> v_buffer_d_;
-    float *             transpose_device_;
-    float *             decode_device_;
+    float *             h_output_data_;
+    std::vector<void *> d_buffer_;
+    float *             d_transpose_;
+    float *             d_decode_;
     // preprocess
-    uchar *             src_dev_data_;
-    uchar *             mid_dev_data_;
+    uchar *             d_src_data_;
+    uchar *             d_mid_data_;
 
     int  OUTPUT_CANDIDATES_;           // 8400: 80 * 80 + 40 * 40 + 20 * 20
     int  yolo26_max_num_output_bbox_;  // 暂时用于yolo26，后续可以删除

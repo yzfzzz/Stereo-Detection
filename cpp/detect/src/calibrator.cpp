@@ -61,12 +61,12 @@ Int8EntropyCalibrator2::Int8EntropyCalibrator2(int          batch_size,
     // allocate memory for a batch of data, batchData is for CPU, deviceInput is
     // for GPU
     batch_data   = new float[input_count_];
-    cudaMalloc(&device_input_, input_count_ * sizeof(float));
+    cudaMalloc(&d_device_input_, input_count_ * sizeof(float));
     read_files_in_dir(img_dir, img_files_);
 }
 
 Int8EntropyCalibrator2::~Int8EntropyCalibrator2() {
-    cudaFree(device_input_);
+    cudaFree(d_device_input_);
     if (batch_data) {
         delete[] batch_data;
     }
@@ -97,8 +97,8 @@ bool Int8EntropyCalibrator2::getBatch(void *       bindings[],
     }
     img_idx_ += batch_size_;
 
-    cudaMemcpy(device_input_, batch_data, input_count_ * sizeof(float), cudaMemcpyHostToDevice);
-    bindings[0] = device_input_;
+    cudaMemcpy(d_device_input_, batch_data, input_count_ * sizeof(float), cudaMemcpyHostToDevice);
+    bindings[0] = d_device_input_;
     return true;
 }
 
