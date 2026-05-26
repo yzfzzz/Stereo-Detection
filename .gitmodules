@@ -6,4 +6,4 @@
 	url = https://github.com/NVlabs/cub.git
 [submodule "model"]
 	path = model
-	url = https://gitee.com/yzfzzz/depth-detect-model.git
+	url = https://github.com/yzfzzz/depth-detect-model.git
