@@ -70,7 +70,7 @@ void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
     }
     std::vector<Detection> res = detector_.getInferResultAsync(frame_input_context.raw_img);
 
-    postProcess(frame_input_context, infer_output_context, res);
+    this->postProcess(frame_input_context, infer_output_context, res);
 }
 
 void Pipeline::postProcess(FrameInputContext &            frame_input_context,

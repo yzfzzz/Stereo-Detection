@@ -55,22 +55,13 @@ cv::Mat drawOneFrame(FrameInputContext &            frame_input_context,
 }
 
 int run(char * video_path) {
-    // read video
-    cv::VideoCapture cap(video_path);
-    if (!cap.isOpened()) {
-        return 0;
-    }
-    FrameMeta frame_meta(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT),
-                         cap.get(cv::CAP_PROP_FPS), FrameSource::VIDEO);
-    long      total_frames_num = static_cast<long>(cap.get(cv::CAP_PROP_FRAME_COUNT));
-    std::cout << "Total frames: " << total_frames_num << std::endl;
-
     // 读取配置文件
-    ConfigManager config_manager("config.yaml");
+    ConfigManager  config_manager("config.yaml");
+    // 文件读写，落盘保存, 以及视频读取（包括模拟相机延迟）
+    IOManager      io_manager(config_manager);
+    FrameMeta      frame_meta = io_manager.Init(video_path);
     // 推理流水线（负责目标检测、深度估计、跟踪、运动状态判断等核心功能）
-    Pipeline      pipeline(config_manager, frame_meta);
-    // 文件读写，落盘保存
-    IOManager io_manager(config_manager, frame_meta.fps, frame_meta.img_w, frame_meta.img_h * 2);
+    Pipeline       pipeline(config_manager, frame_meta);
     // 绘制管理器（负责绘制结果）
     DrawingManager drawing_manager(V_CLASS_NAMES);
     // 显示管理器（负责窗口管理、显示、鼠标点击等）
@@ -84,8 +75,8 @@ int run(char * video_path) {
         FrameInputContext  frame_input_context(num_frames, frame_meta);
         InferOutputContext infer_output_context;
 #if defined(ENABLE_TIMER)
-        if (!DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("1.Cap Read", cap, read,
-                                                    frame_input_context.raw_img) ||
+        if (!DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("1.Cap Read", io_manager, readNextFrame,
+                                                    frame_input_context.raw_img, true) ||
             frame_input_context.raw_img.empty()) {
             break;
         }
@@ -96,7 +87,8 @@ int run(char * video_path) {
                                                infer_output_context);
         total_us += ScopedTimer::GetScopedTimers()[name].back();  // 获取刚刚这次推理的耗时
 #else
-        if (!cap.read(frame_input_context.raw_img) || frame_input_context.raw_img.empty()) {
+        if (!io_manager.readNextFrame(frame_input_context.raw_img) ||
+            frame_input_context.raw_img.empty()) {
             break;
         }
         pipeline.processOverlap(frame_input_context, infer_output_context);
@@ -127,7 +119,7 @@ int run(char * video_path) {
             }
         }
     }
-    cap.release();
+
 #if defined(ENABLE_TIMER)
     std::cout << "==========Summary===========" << std::endl;
     for (auto & kv : ScopedTimer::GetScopedTimers()) {
