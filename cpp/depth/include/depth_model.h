@@ -24,13 +24,13 @@ class DepthModel {
     // 同步推理
     virtual std::pair<cv::Mat, cv::Mat> predict(const cv::Mat & image);
     // 异步推理
-    virtual void                        predictAsync(const cv::Mat & image);
+    virtual void                        predictAsync(uchar * d_image);
     virtual void                        waitAsync();
     virtual std::pair<cv::Mat, cv::Mat> getPredictResultAsync();
 
     // 子类必须实现的专属预处理
     virtual std::vector<float> preProcess(const cv::Mat & image);
-    virtual void               preProcessAsync(const cv::Mat & image);
+    virtual void               preProcessAsync(uchar * d_image);
     std::vector<float>         h_mean_;
     std::vector<float>         h_std_;
 
@@ -59,9 +59,9 @@ class DepthModel {
     unique_ptr_cuda<float>  d_std_;
     unique_ptr_cuda<uchar>  d_before_preprocess_img_data_;
 
-    int                 input_h_, input_w_;      // 模型输出的尺寸
-    int                 raw_img_w_, raw_img_h_;  // 原始输入图像的尺寸
-    std::vector<uchar>  h_depth_output_data_;
-    std::vector<uchar3> h_depth_colormap_data_;
-    Logger              logger_;
+    int                            input_h_, input_w_;      // 模型输出的尺寸
+    int                            raw_img_w_, raw_img_h_;  // 原始输入图像的尺寸
+    unique_ptr_pinned_cuda<uchar>  host_pinned_depth_output_data_;
+    unique_ptr_pinned_cuda<uchar3> host_pinned_depth_colormap_data_;
+    Logger                         logger_;
 };

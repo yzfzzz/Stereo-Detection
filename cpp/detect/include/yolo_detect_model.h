@@ -4,6 +4,8 @@
 #include "memory.h"
 #include "public.h"
 
+#include <opencv2/core/hal/interface.h>
+
 #include <array>
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -26,7 +28,7 @@ class YoloDetectModel {
                     int               numClass   = 80);
     ~YoloDetectModel();
     std::vector<Detection> inference(const cv::Mat & img);
-    void                   inferenceAsync(const cv::Mat & img);
+    void                   inferenceAsync(uchar * d_image);
     std::vector<Detection> postProcess(const cv::Mat & img);
 
     void waitAsync();

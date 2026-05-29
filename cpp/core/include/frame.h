@@ -1,6 +1,11 @@
 #pragma once
 #include "motion_state_engine.h"
+#include "public.h"
 
+#include <memory.h>
+#include <opencv2/core/hal/interface.h>
+
+#include <cstddef>
 #include <opencv2/opencv.hpp>
 #include <unordered_map>
 #include <vector>
@@ -39,10 +44,20 @@ struct FrameInputContext {
                 std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch())
                     .count();
         }
+        auto alloc_cuda = [](size_t bytes) {
+            void * ptr = nullptr;
+            CHECK_CUDA(cudaMalloc(&ptr, bytes));
+            return ptr;
+        };
+        size_t img_size = meta.img_h * meta.img_w * 3;
+        d_raw_img_.reset(static_cast<uchar *>(alloc_cuda(img_size)));
     }
 
-    int       frame_id;
-    FrameMeta meta;
-    double    timestamp;
-    cv::Mat   raw_img;
+    void setFrameID(int id) { frame_id = id; }
+
+    int                    frame_id;
+    FrameMeta              meta;
+    double                 timestamp;
+    unique_ptr_cuda<uchar> d_raw_img_;
+    cv::Mat                raw_img;
 };

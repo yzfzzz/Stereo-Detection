@@ -2,6 +2,8 @@
 #include "config_manager.h"
 #include "frame.h"
 
+#include <memory.h>
+#include <opencv2/core/hal/interface.h>
 #include <sys/stat.h>
 
 #include <opencv2/opencv.hpp>
@@ -34,7 +36,7 @@ class IOManager {
     void closeVideoSource();
 
     // 读取下一帧。如果 simulate_delay 为 true，则会根据上一帧处理耗时跳过对应帧数
-    bool readNextFrame(cv::Mat & frame, bool simulate_delay = false);
+    bool readNextFrame(FrameInputContext & frame_input_context, bool simulate_delay = false);
 
     // 获取视频信息
     FrameMeta getVideoFrameMeta() const;
@@ -48,4 +50,6 @@ class IOManager {
     double                                frame_interval_ms_;  // 每帧的时间间隔（毫秒）
     std::chrono::steady_clock::time_point last_frame_start_time_;
     bool                                  is_first_frame_;     // 标记第一帧
+    unique_ptr_pinned_cuda<uchar>         frame_pinned_buffer_      = nullptr;
+    int                                   frame_pinned_buffer_size_ = 0;
 };

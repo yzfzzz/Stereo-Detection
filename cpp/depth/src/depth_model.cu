@@ -3,6 +3,7 @@
 #include "preprocess.h"
 #include "public.h"
 
+#include <memory.h>
 #include <opencv2/core/hal/interface.h>
 
 #include <cassert>
@@ -120,8 +121,16 @@ void DepthModel::init(const std::string & engine_path, int img_w, int img_h, boo
     context_->setTensorAddress(io_tensor_name_[1].c_str(), d_buffer_[1].get());
 #endif
 
-    h_depth_output_data_.resize(raw_img_h_ * raw_img_w_);
-    h_depth_colormap_data_.resize(raw_img_h_ * raw_img_w_);
+    auto alloc_pinned_cuda = [](size_t bytes) {
+        void * ptr = nullptr;
+        CHECK_CUDA(cudaMallocHost(&ptr, bytes));
+        return ptr;
+    };
+    host_pinned_depth_colormap_data_.reset(
+        static_cast<uchar3 *>(alloc_pinned_cuda(raw_img_h_ * raw_img_w_ * sizeof(uchar3))));
+
+    host_pinned_depth_output_data_.reset(
+        static_cast<uchar *>(alloc_pinned_cuda(raw_img_h_ * raw_img_w_ * sizeof(uchar))));
 #if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
     // Jeston 上使用统一内存
     void * dst_depth    = nullptr;
@@ -184,9 +193,9 @@ std::pair<cv::Mat, cv::Mat> DepthModel::predict(const cv::Mat & image) {
     return std::make_pair(depth_mat, colormap);
 }
 
-void DepthModel::predictAsync(const cv::Mat & image) {
+void DepthModel::predictAsync(uchar * d_image) {
     // 数据异步拷贝至 GPU, 并进行 cuda 前处理
-    preProcessAsync(image);
+    preProcessAsync(d_image);
 
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions
@@ -211,10 +220,10 @@ void DepthModel::predictAsync(const cv::Mat & image) {
         d_buffer_dst_depth_.get(), d_buffer_dst_colormap_.get(), d_depth_infer_min_value_.get(),
         d_depth_infer_max_value_.get(), input_w_, input_h_, raw_img_w_, raw_img_h_, stream_);
 
-    CHECK_CUDA(cudaMemcpyAsync(h_depth_output_data_.data(), d_buffer_dst_depth_.get(),
+    CHECK_CUDA(cudaMemcpyAsync(host_pinned_depth_output_data_.get(), d_buffer_dst_depth_.get(),
                                raw_img_h_ * raw_img_w_ * sizeof(uchar), cudaMemcpyDeviceToHost,
                                stream_));
-    CHECK_CUDA(cudaMemcpyAsync(h_depth_colormap_data_.data(), d_buffer_dst_colormap_.get(),
+    CHECK_CUDA(cudaMemcpyAsync(host_pinned_depth_colormap_data_.get(), d_buffer_dst_colormap_.get(),
                                raw_img_h_ * raw_img_w_ * sizeof(uchar3), cudaMemcpyDeviceToHost,
                                stream_));
 }
@@ -224,16 +233,15 @@ void DepthModel::waitAsync() {
 }
 
 std::pair<cv::Mat, cv::Mat> DepthModel::getPredictResultAsync() {
-    auto depth_output   = cv::Mat(raw_img_h_, raw_img_w_, CV_8UC1, h_depth_output_data_.data());
-    auto depth_colormap = cv::Mat(raw_img_h_, raw_img_w_, CV_8UC3, h_depth_colormap_data_.data());
+    auto depth_output =
+        cv::Mat(raw_img_h_, raw_img_w_, CV_8UC1, host_pinned_depth_output_data_.get());
+    auto depth_colormap =
+        cv::Mat(raw_img_h_, raw_img_w_, CV_8UC3, host_pinned_depth_colormap_data_.get());
     std::pair<cv::Mat, cv::Mat> result = std::make_pair(depth_output, depth_colormap);
     return result;
 }
 
-void DepthModel::preProcessAsync(const cv::Mat & image) {
-    CHECK_CUDA(cudaMemcpyAsync(d_before_preprocess_img_data_.get(), image.data,
-                               3 * raw_img_h_ * raw_img_w_ * sizeof(uchar), cudaMemcpyHostToDevice,
-                               stream_));
-    depthPreprocess(d_before_preprocess_img_data_.get(), (float *) d_buffer_[0].get(), raw_img_w_,
-                    raw_img_h_, input_w_, input_h_, d_mean_.get(), d_std_.get(), stream_);
+void DepthModel::preProcessAsync(uchar * d_image) {
+    depthPreprocess(d_image, (float *) d_buffer_[0].get(), raw_img_w_, raw_img_h_, input_w_,
+                    input_h_, d_mean_.get(), d_std_.get(), stream_);
 }

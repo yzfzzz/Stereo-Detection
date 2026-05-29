@@ -68,15 +68,15 @@ int run(char * video_path) {
     DisplayManager display_manager(config_manager, "Detection Result",
                                    cv::Size(frame_meta.img_w, frame_meta.img_h * 2));
 
-    int    num_frames = 0;
-    double total_us   = 0;
-
+    int               num_frames = 0;
+    double            total_us   = 0;
+    FrameInputContext frame_input_context(num_frames, frame_meta);
     while (true) {
-        FrameInputContext  frame_input_context(num_frames, frame_meta);
+        frame_input_context.setFrameID(num_frames);
         InferOutputContext infer_output_context;
 #if defined(ENABLE_TIMER)
         if (!DEBUG_FUNCTION_RUNNING_TIME_MEMBER_REF("1.Cap Read", io_manager, readNextFrame,
-                                                    frame_input_context.raw_img, true) ||
+                                                    frame_input_context, true) ||
             frame_input_context.raw_img.empty()) {
             break;
         }
@@ -87,10 +87,11 @@ int run(char * video_path) {
                                                infer_output_context);
         total_us += ScopedTimer::GetScopedTimers()[name].back();  // 获取刚刚这次推理的耗时
 #else
-        if (!io_manager.readNextFrame(frame_input_context.raw_img) ||
+        if (!io_manager.readNextFrame(frame_input_context, true) ||
             frame_input_context.raw_img.empty()) {
             break;
         }
+
         pipeline.processOverlap(frame_input_context, infer_output_context);
 
 #endif

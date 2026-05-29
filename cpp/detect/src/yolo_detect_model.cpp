@@ -5,6 +5,7 @@
 #include "public.h"
 
 #include <NvOnnxParser.h>
+#include <opencv2/core/hal/interface.h>
 
 #include <cassert>
 #include <fstream>
@@ -233,13 +234,9 @@ std::vector<Detection> YoloDetectModel::postProcess(const cv::Mat & img) {
     return vDetections;
 }
 
-void YoloDetectModel::inferenceAsync(const cv::Mat & img) {
-    if (img.empty()) {
-        return;
-    }
-
-    preprocess(img, static_cast<float *>(d_buffer_[0].get()), d_src_data_.get(), d_mid_data_.get(),
-               raw_img_h_, raw_img_w_, input_h_, input_w_, stream_);
+void YoloDetectModel::inferenceAsync(uchar * d_image) {
+    preprocess_v2(static_cast<float *>(d_buffer_[0].get()), d_image, d_mid_data_.get(), raw_img_h_,
+                  raw_img_w_, input_h_, input_w_, stream_);
 
 #if defined(__aarch64__) || defined(__arm__) || NV_TENSORRT_MAJOR < 10
     // For Jetson Nano (ARM64) and older TensorRT versions

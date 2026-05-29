@@ -52,11 +52,11 @@ void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
                               InferOutputContext & infer_output_context) {
     bool do_depth = (!has_cached_depth_) ||
                     ((frame_input_context.frame_id - 1) % config_manager_.getDepthInterval() == 0);
-
+    cudaStreamSynchronize(0);  // 等待图片copy到显存中
     if (do_depth) {
-        depth_model_.predictAsync(frame_input_context.raw_img);
+        depth_model_.predictAsync(frame_input_context.d_raw_img_.get());
     }
-    detector_.inferenceAsync(frame_input_context.raw_img);
+    detector_.inferenceAsync(frame_input_context.d_raw_img_.get());
 
     depth_model_.waitAsync();
     detector_.waitAsync();

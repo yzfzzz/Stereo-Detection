@@ -1,9 +1,11 @@
 #include "io_manager.h"
 
 #include "frame.h"
+#include "public.h"
 
 #include <cstdlib>  // For system()
 #include <iostream>
+#include <ostream>
 #include <thread>
 
 IOManager::IOManager(ConfigManager & config_manager) :
@@ -32,6 +34,16 @@ FrameMeta IOManager::Init(const std::string & video_path) {
                       << std::endl;
         }
     }
+
+    frame_pinned_buffer_size_ = frame_meta.img_w * frame_meta.img_h * 3;
+    auto alloc_pinned_cuda    = [](size_t bytes) {
+        void * ptr = nullptr;
+        CHECK_CUDA(cudaMallocHost(&ptr, bytes));
+        return ptr;
+    };
+    frame_pinned_buffer_.reset(
+        static_cast<uchar *>(alloc_pinned_cuda(frame_pinned_buffer_size_ * sizeof(uchar))));
+
     return frame_meta;
 }
 
@@ -100,41 +112,45 @@ FrameMeta IOManager::getVideoFrameMeta() const {
                      video_capture_.get(cv::CAP_PROP_FPS), FrameSource::VIDEO);
 }
 
-bool IOManager::readNextFrame(cv::Mat & frame, bool simulate_delay) {
+bool IOManager::readNextFrame(FrameInputContext & frame_input_context, bool simulate_delay) {
     if (!video_capture_.isOpened()) {
         return false;
     }
 
     // 第一帧或者不模拟延迟时，直接读取
     if (is_first_frame_ || !simulate_delay) {
-        is_first_frame_        = false;
-        last_frame_start_time_ = std::chrono::steady_clock::now();
-        return video_capture_.read(frame);
-    }
+        is_first_frame_ = false;
+    } else {
+        // 计算上一帧的实际处理耗时
+        auto frame_process_start = std::chrono::steady_clock::now();
+        auto elapsed_ms =
+            std::chrono::duration<double, std::milli>(frame_process_start - last_frame_start_time_)
+                .count();
 
-    // 计算上一帧的实际处理耗时
-    auto frame_process_start = std::chrono::steady_clock::now();
-    auto elapsed_ms =
-        std::chrono::duration<double, std::milli>(frame_process_start - last_frame_start_time_)
-            .count();
+        // 只有当有有效耗时和有效帧间隔时才计算跳帧
+        if (frame_interval_ms_ > 0) {
+            int frames_to_skip = static_cast<int>(elapsed_ms / frame_interval_ms_) - 1;
+            std::cout << "Simulating delay: elapsed " << elapsed_ms << " ms, skipping "
+                      << frames_to_skip << " frames." << std::endl;
 
-    // 只有当有有效耗时和有效帧间隔时才计算跳帧
-    if (frame_interval_ms_ > 0) {
-        int frames_to_skip = static_cast<int>(elapsed_ms / frame_interval_ms_) - 1;
-        std::cout << "Simulating delay: elapsed " << elapsed_ms << " ms, skipping "
-                  << frames_to_skip << " frames." << std::endl;
-
-        // 跳过相应的帧（模拟相机延迟）
-        for (int skip = 0; skip < frames_to_skip; skip++) {
-            cv::Mat dummy;
-            if (!video_capture_.read(dummy)) {
-                return false;
+            // 跳过相应的帧（模拟相机延迟）
+            for (int skip = 0; skip < frames_to_skip; skip++) {
+                cv::Mat dummy;
+                if (!video_capture_.read(dummy)) {
+                    return false;
+                }
             }
         }
     }
-
+    frame_input_context.raw_img =
+        cv::Mat(frame_input_context.meta.img_h, frame_input_context.meta.img_w, CV_8UC3,
+                frame_pinned_buffer_.get());
     // 读取处理用的当前帧
-    bool result = video_capture_.read(frame);
+    bool result = video_capture_.read(frame_input_context.raw_img);
+    if (result) {
+        cudaMemcpyAsync(frame_input_context.d_raw_img_.get(), frame_input_context.raw_img.data,
+                        frame_pinned_buffer_size_, cudaMemcpyHostToDevice);
+    }
 
     // 更新下一帧的处理开始时间
     last_frame_start_time_ = std::chrono::steady_clock::now();
