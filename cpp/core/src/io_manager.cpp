@@ -130,8 +130,6 @@ bool IOManager::readNextFrame(FrameInputContext & frame_input_context, bool simu
         // 只有当有有效耗时和有效帧间隔时才计算跳帧
         if (frame_interval_ms_ > 0) {
             int frames_to_skip = static_cast<int>(elapsed_ms / frame_interval_ms_) - 1;
-            std::cout << "Simulating delay: elapsed " << elapsed_ms << " ms, skipping "
-                      << frames_to_skip << " frames." << std::endl;
 
             // 跳过相应的帧（模拟相机延迟）
             for (int skip = 0; skip < frames_to_skip; skip++) {
