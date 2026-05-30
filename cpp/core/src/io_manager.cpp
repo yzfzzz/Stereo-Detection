@@ -34,16 +34,6 @@ FrameMeta IOManager::Init(const std::string & video_path) {
                       << std::endl;
         }
     }
-
-    frame_pinned_buffer_size_ = frame_meta.img_w * frame_meta.img_h * 3;
-    auto alloc_pinned_cuda    = [](size_t bytes) {
-        void * ptr = nullptr;
-        CHECK_CUDA(cudaMallocHost(&ptr, bytes));
-        return ptr;
-    };
-    frame_pinned_buffer_.reset(
-        static_cast<uchar *>(alloc_pinned_cuda(frame_pinned_buffer_size_ * sizeof(uchar))));
-
     return frame_meta;
 }
 
@@ -140,16 +130,18 @@ bool IOManager::readNextFrame(FrameInputContext & frame_input_context, bool simu
             }
         }
     }
+// 读取处理用的当前帧
+#if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
     frame_input_context.raw_img =
         cv::Mat(frame_input_context.meta.img_h, frame_input_context.meta.img_w, CV_8UC3,
-                frame_pinned_buffer_.get());
-    // 读取处理用的当前帧
+                frame_input_context.d_raw_img_.get());
+#endif
+
     bool result = video_capture_.read(frame_input_context.raw_img);
     if (result) {
-        cudaMemcpyAsync(frame_input_context.d_raw_img_.get(), frame_input_context.raw_img.data,
-                        frame_pinned_buffer_size_, cudaMemcpyHostToDevice);
+        cudaMemcpy(frame_input_context.d_raw_img_.get(), frame_input_context.raw_img.data,
+                   frame_input_context.img_size, cudaMemcpyHostToDevice);
     }
-
     // 更新下一帧的处理开始时间
     last_frame_start_time_ = std::chrono::steady_clock::now();
 

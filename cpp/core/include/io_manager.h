@@ -50,6 +50,4 @@ class IOManager {
     double                                frame_interval_ms_;  // 每帧的时间间隔（毫秒）
     std::chrono::steady_clock::time_point last_frame_start_time_;
     bool                                  is_first_frame_;     // 标记第一帧
-    unique_ptr_pinned_cuda<uchar>         frame_pinned_buffer_      = nullptr;
-    int                                   frame_pinned_buffer_size_ = 0;
 };
