@@ -44,13 +44,14 @@ struct FrameInputContext {
                 std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch())
                     .count();
         }
-        auto alloc_cuda = [](size_t bytes) {
-            void * ptr = nullptr;
-            CHECK_CUDA(cudaMalloc(&ptr, bytes));
-            return ptr;
-        };
-        size_t img_size = meta.img_h * meta.img_w * 3;
-        d_raw_img_.reset(static_cast<uchar *>(alloc_cuda(img_size)));
+        img_size   = meta.img_h * meta.img_w * 3;
+        void * ptr = nullptr;
+#if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
+        CHECK_CUDA(cudaMallocManaged(&ptr, img_size));
+#else
+        CHECK_CUDA(cudaMalloc(&ptr, img_size));
+#endif
+        d_raw_img_.reset(static_cast<uchar *>(ptr));
     }
 
     void setFrameID(int id) { frame_id = id; }
@@ -60,4 +61,5 @@ struct FrameInputContext {
     double                 timestamp;
     unique_ptr_cuda<uchar> d_raw_img_;
     cv::Mat                raw_img;
+    size_t                 img_size;
 };
