@@ -1,4 +1,6 @@
 #include "depth_model.h"
+
+#include "cub_utils.h"
 #include "postprocess.h"
 #include "preprocess.h"
 #include "public.h"
@@ -7,7 +9,6 @@
 #include <opencv2/core/hal/interface.h>
 
 #include <cassert>
-#include <cub/cub.cuh>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -104,11 +105,9 @@ void DepthModel::init(const std::string & engine_path, int img_w, int img_h, boo
     d_before_preprocess_img_data_.reset(
         static_cast<uchar *>(alloc_cuda(3 * raw_img_h_ * raw_img_w_ * sizeof(uchar))));
 
-    // 查询 CUB 所需临时显存大小
-    cub::DeviceReduce::Min(nullptr, cub_min_bytes_, (float *) d_buffer_[1].get(),
-                           d_depth_infer_min_value_.get(), input_h_ * input_w_, stream_);
-    cub::DeviceReduce::Max(nullptr, cub_max_bytes_, (float *) d_buffer_[1].get(),
-                           d_depth_infer_max_value_.get(), input_h_ * input_w_, stream_);
+    // 查询 CUB 所需临时显存大小（由封装函数实现）
+    cub_get_min_max_temp_bytes(static_cast<float *>(d_buffer_[1].get()), input_h_ * input_w_,
+                               &cub_min_bytes_, &cub_max_bytes_, stream_);
     cub_bytes_ = std::max(cub_min_bytes_, cub_max_bytes_);
     d_cub_mid_min_.reset(alloc_cuda(cub_bytes_));
     d_cub_mid_max_.reset(alloc_cuda(cub_bytes_));
@@ -210,10 +209,11 @@ void DepthModel::predictAsync(uchar * d_image) {
         return;
     }
 
-    cub::DeviceReduce::Min(d_cub_mid_min_.get(), cub_bytes_, (float *) d_buffer_[1].get(),
-                           d_depth_infer_min_value_.get(), input_h_ * input_w_, stream_);
-    cub::DeviceReduce::Max(d_cub_mid_max_.get(), cub_bytes_, (float *) d_buffer_[1].get(),
-                           d_depth_infer_max_value_.get(), input_h_ * input_w_, stream_);
+    // Use wrapper in op_kernel to perform reductions
+    cub_device_reduce_min(d_cub_mid_min_.get(), cub_bytes_, (float *) d_buffer_[1].get(),
+                          d_depth_infer_min_value_.get(), input_h_ * input_w_, stream_);
+    cub_device_reduce_max(d_cub_mid_max_.get(), cub_bytes_, (float *) d_buffer_[1].get(),
+                          d_depth_infer_max_value_.get(), input_h_ * input_w_, stream_);
 
     normalize_colormap_resize(
         (float *) d_buffer_[1].get(), d_buffer_norm_depth_.get(), d_buffer_norm_colormap_.get(),
