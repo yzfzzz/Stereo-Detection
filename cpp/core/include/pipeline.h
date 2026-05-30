@@ -22,9 +22,8 @@ class Pipeline {
 
     DepthModel & getDepthModel() { return depth_model_; }
 
-    void postProcess(FrameInputContext &            frame_input_context,
-                     InferOutputContext &           infer_output_context,
-                     const std::vector<Detection> & res);
+    void postProcess(FrameInputContext &  frame_input_context,
+                     InferOutputContext & infer_output_context);
 
 
   private:

@@ -130,13 +130,7 @@ bool IOManager::readNextFrame(FrameInputContext & frame_input_context, bool simu
             }
         }
     }
-// 读取处理用的当前帧
-#if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
-    frame_input_context.raw_img =
-        cv::Mat(frame_input_context.meta.img_h, frame_input_context.meta.img_w, CV_8UC3,
-                frame_input_context.d_raw_img_.get());
-#endif
-
+    // 读取处理用的当前帧
     bool result = video_capture_.read(frame_input_context.raw_img);
     if (result) {
         cudaMemcpy(frame_input_context.d_raw_img_.get(), frame_input_context.raw_img.data,

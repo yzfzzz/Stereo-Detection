@@ -46,11 +46,7 @@ struct FrameInputContext {
         }
         img_size   = meta.img_h * meta.img_w * 3;
         void * ptr = nullptr;
-#if defined(__aarch64__) && defined(ENABLE_JESTON_MEM_MANAGED)
-        CHECK_CUDA(cudaMallocManaged(&ptr, img_size));
-#else
         CHECK_CUDA(cudaMalloc(&ptr, img_size));
-#endif
         d_raw_img_.reset(static_cast<uchar *>(ptr));
     }
 
