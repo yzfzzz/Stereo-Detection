@@ -4,6 +4,7 @@
 #include "config_manager.h"
 #include "frame.h"
 #include "motion_state_engine.h"
+#include "public.h"
 
 Pipeline::Pipeline(ConfigManager config_manager, FrameMeta frame_meta) :
     config_manager_(config_manager),
@@ -57,16 +58,20 @@ void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
         depth_model_.predictAsync(frame_input_context.d_raw_img_.get());
     }
     detector_.waitAsync();
-    std::vector<Detection> res = detector_.getInferResultAsync(frame_input_context.raw_img);
-    std::vector<Object>    objects;
-    for (size_t j = 0; j < res.size(); j++) {
-        if (isTrackingClass(res[j].classId)) {
-            cv::Rect_<float> rect(res[j].bbox[0], res[j].bbox[1], (res[j].bbox[2] - res[j].bbox[0]),
-                                  (res[j].bbox[3] - res[j].bbox[1]));
-            objects.push_back({ rect, res[j].classId, res[j].conf });
+    {
+        nvtx3::scoped_range    tracker_scope("get infer res + tracker process");
+        std::vector<Detection> res = detector_.getInferResultAsync(frame_input_context.raw_img);
+        std::vector<Object>    objects;
+        for (size_t j = 0; j < res.size(); j++) {
+            if (isTrackingClass(res[j].classId)) {
+                cv::Rect_<float> rect(res[j].bbox[0], res[j].bbox[1],
+                                      (res[j].bbox[2] - res[j].bbox[0]),
+                                      (res[j].bbox[3] - res[j].bbox[1]));
+                objects.push_back({ rect, res[j].classId, res[j].conf });
+            }
         }
+        infer_output_context.tracked_objects = tracker_.update(objects);
     }
-    infer_output_context.tracked_objects = tracker_.update(objects);
 
     depth_model_.waitAsync();
     if (do_depth) {
@@ -80,6 +85,7 @@ void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
 
 void Pipeline::postProcess(FrameInputContext &  frame_input_context,
                            InferOutputContext & infer_output_context) {
+    nvtx3::scoped_range tracker_scope("pipeline postProcess");
     infer_output_context.motion_records.clear();
     for (int i = 0; i < infer_output_context.tracked_objects.size(); i++) {
         if (infer_output_context.tracked_objects[i].tlwh_[2] *

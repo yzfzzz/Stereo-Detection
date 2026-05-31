@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <nvtx3/nvtx3.hpp>
 #include <opencv2/opencv.hpp>
 #include <string>
 
