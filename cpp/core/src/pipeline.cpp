@@ -73,9 +73,6 @@ void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
         auto depth_result                 = depth_model_.getPredictResultAsync();
         infer_output_context.result_depth = depth_result.first;
         infer_output_context.depth_vis    = depth_result.second;
-    } else {
-        infer_output_context.result_depth = cached_depth_;
-        infer_output_context.depth_vis    = cached_depth_vis_;
     }
 
     this->postProcess(frame_input_context, infer_output_context);
@@ -83,6 +80,7 @@ void Pipeline::processOverlap(FrameInputContext &  frame_input_context,
 
 void Pipeline::postProcess(FrameInputContext &  frame_input_context,
                            InferOutputContext & infer_output_context) {
+    infer_output_context.motion_records.clear();
     for (int i = 0; i < infer_output_context.tracked_objects.size(); i++) {
         if (infer_output_context.tracked_objects[i].tlwh_[2] *
                 infer_output_context.tracked_objects[i].tlwh_[3] <=
@@ -99,8 +97,4 @@ void Pipeline::postProcess(FrameInputContext &  frame_input_context,
             { track_id, motion_state_engine_.computeMotionState(track_id, current_depth,
                                                                 frame_input_context.timestamp) });
     }
-
-    // 更新缓存
-    cached_depth_     = infer_output_context.result_depth;
-    cached_depth_vis_ = infer_output_context.depth_vis;
 }
