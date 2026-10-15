@@ -12,7 +12,7 @@
 - 📍 基于 BYTETracker 的多目标跟踪（阈值全部由配置驱动）
 - 🚨 快速靠近（approach）检测：基线 + 累计变化率 + 进出双边去抖
 - 📡 报警 JSON over TCP 上报
-- 💾 异步落盘缓冲：上限可配，磁盘跟不上时丢新帧并计数告警，退出自动排空
+- 💾 落盘缓冲：上限可配，磁盘跟不上时丢新帧并计数告警，退出自动排空
 - 🔧 支持跨平台构建（x86 / Jetson TX2 / Jetson Nano）
 
 ⚠️ **注意**：对于B站视频中旧版的代码，请运行（`release/v1.0` 是一个 **tag**，切换后会处于 detached HEAD）：
@@ -43,11 +43,11 @@ git checkout release/v1.0
 - 💻 语言：C++14
 - 📦 构建：CMake 3.10
 - 🎯 推理后端：TensorRT（兼容 8.x / 10.x）、ONNX Runtime 1.10（CPU 兜底）
-- ⚙️ 并行/加速：CUDA、cuBLAS、cuDNN
+- ⚙️ 并行/加速：CUDA
 - 🖼️ 视觉处理：OpenCV 4.x
 - 🧩 配置/日志：yaml-cpp、spdlog
 - ➗ 数值计算：Eigen3
-- 🎚️ 滤波：1€ 滤波（第三方 `casiez/OneEuroFilter`）、OpenCV `cv::KalmanFilter`
+- 🎚️ 滤波：OpenCV `cv::KalmanFilter`
 - 📡 网络上报：nlohmann/json + TCP（子模块 `third_party/JsonSenderTest`）
 - 📊 基准测试：Google Benchmark
 - 🤖 算法：Yolo，DepthAnything，LiteMono，YoloDepth，BYTETracker
@@ -94,29 +94,8 @@ cd depth-detect
 
 ---
 
-### 报警上报
 
-报警经 TCP 以 JSON 外发，结构为：
 
-```json
-{
-  "timestamp": 0.0, "frame_id": 0, "img_w": 1280, "img_h": 720,
-  "objects": [
-    { "x": 0, "y": 0, "w": 0, "h": 0, "depth": 0,
-      "class_id": 0, "track_id": 0,
-      "velocity": 0, "ttc": -1, "is_danger": true }
-  ]
-}
-```
-
-- `objects` 包含本帧**所有通过小目标过滤、且已进入快速靠近（approach）判定单元**的目标，不限于危险目标；每条带 `is_danger` 标记（= approach 命中），是否报警由接收端取舍。
-- 小目标过滤：面积 ≤ `min_object_area` 的目标直接丢弃；`car`（`class_id=2`）的阈值放大到 4 倍。
-- `depth` 取 metric 深度图的框内均值，四舍五入到**整数米**（`std::lround`）；深度功能关闭时为 `0`。
-- `timestamp` 用真实墙钟时间（Unix 秒），不是视频时间轴。
-- `velocity` / `ttc` 是**旧 TTC 路遗留字段，仅为兼容保留**：现在不做 TTC 估计，分别固定为 `0` 与 `-1`。
-- 连接建立与断联重连都由网络层（`TcpHandler`）负责；非 `CONNECTED` 状态下报警直接丢弃并计数，不排队重发。
-
----
 
 <a id="目录结构"></a>
 
@@ -136,7 +115,7 @@ depth-detect/
 │   ├── tools/                    # VisualManager、ControlPanel、ScopedTimer
 │   └── utils/                    # ConfigManager、LoggerManager
 ├── benchmark/                    # Google Benchmark 与回归测试目标
-├── scripts/                      # read_config.py、update_config.py（start.sh 配套）
+├── scripts/                      # config_tool.py（gen/read/refresh 三合一，start.sh 配套）
 ├── start.sh / build.sh / format.sh
 ├── Dockerfile
 ├── bin/                          # 可执行文件、config.yaml、benchmark.yaml、out_dir、logs
@@ -151,7 +130,7 @@ depth-detect/
 
 ## 📐 系统架构
 
-![架构图](./doc/arch3.png)
+![架构图](./doc/arch4.png)
 
 ### 推理调度
 
@@ -163,88 +142,124 @@ depth-detect/
 
 ONNX 后端不具备异步能力，重叠路径会自动退化为同步。
 
+### 推理后端选择
+
+后端由 `prefer.backend` 控制（缺省 `auto`），模型层与调度逻辑对后端类型无感知，只按后端上报的张量驻留位置（`TensorLocation::Host / CudaDevice`）自动选择 CPU（OpenCV）或 CUDA 前/后处理路径：
+
+| `prefer.backend` | 行为 |
+| ---------------- | ---- |
+| `auto`（缺省）   | 历史回退链：`use_gpu=true` 且 GPU 可用且配置了 `engine` 路径 → TensorRT，否则 → ONNX Runtime |
+| `tensorrt`       | 只用 TensorRT，加载失败直接报错，不静默回退 |
+| `onnxruntime`    | 只用 ONNX Runtime (CPU) |
+| `qnn`（预留）    | QNN 后端（ Qualcomm HTP/NPU），代码接入点已就绪，实现落地后启用 |
+
+
+
 ### 单帧数据流
+
+一帧的处理分三段：**主流程**（每帧都走）→ **推理调度**（三种模式择一）→ **输出**（报警与落盘）。
+下面三张图依次展开，`autonumber` 的编号只在本图内有效。
+
+#### ① 主流程：一帧的完整生命周期
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant Main as main.cpp
     participant IO as IOManager
-    participant Worker as SaveWorker 线程（消费者）
     participant Pipe as Pipeline
-    participant Yolo as YoloDetectModel
-    participant Depth as DepthModel
-    participant Track as BYTETracker
-    participant Motion as MotionStateEngine
-    participant Alert as DangerAlertHandler
-    participant Tcp as TcpHandler
-    participant Draw as DrawingManager
-    participant UI as DisplayManager / ControlPanel
-
-    Note over Pipe: 构造期由配置解析调度策略，优先级 stagger_infer > overlap > 串行
+    participant Model as 推理模型 Yolo / Depth
+    participant Trk as BYTETracker
+    participant Mot as MotionStateEngine
 
     loop 每帧
-        Main->>IO: readNextFrame(context, simulate_delay)
-        IO-->>Main: raw_img，GPU 模式同时准备 d_raw_img
-        Main->>Pipe: process()（唯一入口，内部按 schedule_mode_ 分发）
-
-        alt 串行 SYNC（processSync）：检测完整跑完再提交深度
-            Pipe->>Yolo: runInference()
-            Yolo-->>Pipe: detections
-            Pipe->>Track: update(筛选后的检测目标)
-            Track-->>Pipe: tracked_objects
-            Pipe->>Depth: runInference()
-            Depth-->>Pipe: result_depth, depth_vis
-        else 重叠 OVERLAP（processOverlap）/ 错峰的碰撞帧（processStagger 转发）：两路同帧
-            Note over Pipe,Depth: 只有 TensorRT 后端走异步；ONNX / lite_mono 会逐段退化为同步
-            Pipe->>Pipe: 选推理模型：overlapDetector()（轻量模型优先，未加载则回落主模型）
-            Pipe->>Depth: runInferenceAsync()（先提交深度，最大化重叠窗口）
-            Pipe->>Yolo: runInferenceAsync()
-            Pipe->>Yolo: getInferOutputResult()
-            Yolo-->>Pipe: detections（该段 CPU 工作与 GPU 上的深度推理重叠）
-            Pipe->>Track: update(筛选后的检测目标)
-            Track-->>Pipe: tracked_objects
-            Pipe->>Depth: getInferOutputResult()
-            Depth-->>Pipe: result_depth, depth_vis
-        else 错峰 STAGGER · 单路帧 / 空帧（runBranchesSerially）：按需执行
-            Note over Pipe: 触发判定：帧号对 detect_interval / depth_interval 取模为 0
-            Pipe->>Yolo: runInference()（仅检测帧）
-            Yolo-->>Pipe: detections
-            Pipe->>Track: update(筛选后的检测目标)（仅检测帧，紧跟检测）
-            Track-->>Pipe: tracked_objects
-            Pipe->>Depth: runInference()（仅深度帧）
-            Depth-->>Pipe: result_depth, depth_vis
-            Note over Pipe: 未触发的那一路不写输出，下游沿用上一帧结果；两路都未触发时只更新运动状态
-        end
-
-        Pipe->>Motion: updateMotionStates()：逐 track 框内采样深度 + 快速靠近(approach)判定
-        Motion-->>Pipe: motion_records（approach 报警）
+        Main->>IO: readNextFrame()
+        IO-->>Main: raw_img
+        Main->>Pipe: process() 唯一入口
+        Note over Pipe,Model: 推理段的提交顺序随调度模式变化，见下方「推理调度」
+        Pipe->>Model: 检测 runInference()
+        Model-->>Pipe: detections
+        Pipe->>Trk: update()
+        Trk-->>Pipe: tracked_objects
+        Pipe->>Model: 深度 runInference()
+        Model-->>Pipe: result_depth, depth_vis
+        Pipe->>Mot: updateMotionStates()
+        Mot-->>Pipe: motion_records
         Pipe-->>Main: InferOutputContext
-
-        Main->>Alert: buildAlert()
-        Alert-->>Main: AlertMessage（逐 track 组装：小目标过滤 + is_danger 标记）
-        opt 本帧有目标框
-            Main->>IO: sendAlert(alert)
-            IO->>Tcp: sendJson()
-        end
-
-        Main->>Draw: 绘制框 / 三项分数 / 危险状态，并写全局信息（帧号、fps、目标数）
-        Draw->>Draw: concatenateFrames(raw_img, depth_vis)（深度未启用时退回仅原图）
-        Draw-->>Main: out_frame
-
-        Main->>IO: saveFrame(out_frame, num_frames)
-        IO->>Worker: 首次调用拉起消费者线程（幂等）、首帧懒初始化 VideoWriter
-        IO->>Worker: 入队 SaveTask（Mat 引用计数浅拷贝，非阻塞；缓冲满则丢新帧并计数）
-        Note over IO,Worker: 生产者只入队不编码；消费者独立线程（SCHED_IDLE，CPU 空闲才跑）：<br/>出队 → 锁外编码（JPEG q75 / VideoWriter.write）→ 写盘
-        opt display_manager.is_display 为 true
-            Main->>UI: show(out_frame) 并刷新控制面板，waitKey(1)（ESC 退出）
-        end
+        Main->>Main: 报警组装 / 绘制 / 落盘
     end
-
-    Main->>IO: 析构 / 排空
-    IO->>Worker: stopSaveWorker()：置停止标志并唤醒
-    Worker->>Worker: 排空队列（drain）后退出，打印 written / dropped / io_failed / peak_buffer
-    Main->>Main: 退出：打印各阶段 avg / P95 / P99，输出 TCP 重连统计
 ```
+
+#### ② 推理调度：`process()` 内部的三条路径
+
+`process()` 是唯一入口，按 `schedule_mode_` 分派；三条路径的差别只在**推理段的提交顺序**：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Pipe as Pipeline
+    participant Det as YoloDetectModel
+    participant Dep as DepthModel
+    participant Trk as BYTETracker
+
+    alt 串行 SYNC
+        Note over Pipe,Trk: processSync()：检测整条链跑完，才提交深度
+        Pipe->>Det: runInference()
+        Det-->>Pipe: detections
+        Pipe->>Trk: update()
+        Trk-->>Pipe: tracked_objects
+        Pipe->>Dep: runInference()
+        Dep-->>Pipe: result_depth
+    else 重叠 OVERLAP / 错峰碰撞帧
+        Note over Pipe,Trk: processOverlap()：先提交深度再提交检测，让两段 GPU 工作重叠
+        Pipe->>Dep: runInferenceAsync()
+        Pipe->>Det: runInferenceAsync()
+        Det-->>Pipe: detections
+        Pipe->>Trk: update()
+        Trk-->>Pipe: tracked_objects
+        Pipe->>Dep: getInferOutputResult()
+        Dep-->>Pipe: result_depth
+    else 错峰 STAGGER 单路帧
+        Note over Pipe,Trk: runBranchesSerially()：帧号对 detect_interval / depth_interval 取模
+        Pipe->>Det: runInference() 仅检测帧
+        Det-->>Pipe: detections
+        Pipe->>Trk: update() 仅检测帧
+        Trk-->>Pipe: tracked_objects
+        Pipe->>Dep: runInference() 仅深度帧
+        Dep-->>Pipe: result_depth
+    end
+```
+
+#### ③ 输出：报警组装、绘制与异步落盘
+
+落盘走异步缓冲 —— 生产者只入队、消费者独立编码，因此写盘不阻塞主流水线。
+`is_display` 为真时，Main 另调 `DisplayManager::show()` 并 `waitKey(1)`。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Main as main.cpp
+    participant Alert as DangerAlertHandler
+    participant Draw as DrawingManager
+    participant IO as IOManager
+    participant Worker as SaveWorker 线程
+
+    Main->>Alert: buildAlert()
+    Note over Alert: 逐 track 组装：小目标过滤 + is_danger 标记
+    Alert-->>Main: AlertMessage
+    opt 本帧有目标框
+        Main->>IO: sendAlert()
+        Note over IO,Worker: TcpHandler::sendJson()，断联即丢弃
+    end
+    Main->>Draw: 绘制框 / 分数 / 危险状态
+    Note over Draw: 拼接 raw_img + depth_vis
+    Draw-->>Main: out_frame
+    Main->>IO: saveFrame()
+    IO->>Worker: 入队 SaveTask
+    Note over Worker: 独立线程 → 入队 → 写盘
+```
+
+
 
 ---
 
@@ -352,11 +367,9 @@ FP16 vs FP32 误差（同一视频取前 1000 帧）：
 | 指标                  | 均值              | 峰值              | 峰值时刻            |
 | --------------------- | -----------------:| -----------------:| -------------------:|
 | 系统内存 used         | 3975 MB           | 4194 MB           | 428.6 s             |
-| 进程 RSS / HWM        | 2272 MB / 2272 MB | 2481 MB / 2485 MB | 353.6 s / 436.2 s   |
+| 进程内存占用       | 2272 MB / 2272 MB | 2481 MB / 2485 MB | 353.6 s / 436.2 s   |
 | 进程 CPU              | 55.7%             | 120.0%            | 4.6 s（引擎加载期） |
 | GPU 温度              | 37.2 °C           | **39.5 °C**       | 431.6 s             |
-| MCPU / BCPU / PLL     | 35.1 °C           | 37.0 °C           | 362.0 s             |
-| Tdiode / Tboard tegra | 37.1 °C / 32.7 °C | 39.3 °C / 34.0 °C | 422.8 s / 233.4 s   |
 
 - 全程温度 28~40 °C，**未触发热节流**（TX2 上限约 85 °C）；内存峰值 4.2 GB（TX2 上限 8 GB），资源侧仍有富余。
 - 本次采集未包含功耗（INA3221）与 GPU 占用。
@@ -377,7 +390,7 @@ cd bin && python3 ../scripts/jetson_monitor.py \
 
 - TRT FP16 相对 ONNX CPU 端到端 **19.1×** 加速，相对 FP32 **1.42×**，精度损失（深度 0.17%、检测 IoU 0.973）可忽略。
 - 640×480 视频上错峰调度（检测 1 / 深度 3）做到 **13.5 fps**；瓶颈是深度模型（单次 56.4 ms）。
-- TX2 只有 2 个 SM，**重叠（overlap）带不来收益**（+3%），提升必须靠减少计算量（剪枝 / 降深度频次 / 换轻量模型）。
+- **重叠（overlap）带不来收益**（100 → 97 ms，+3%）：两路的 CUDA 前/后处理与推理**全部是 GPU 侧工作**，各自都能占满 SM。TX2 的 2 个 SM 只是让可填的空隙更碎（x86 RTX 5060 上同样只有 4.8%），因此提升必须靠减少计算量（剪枝 / 降深度频次 / 换轻量模型）。
 - 内存与温度余量充足，说明限制在算力而非资源。
 
 ### 早期模型组对照：Jetson TX2 vs GeForce RTX 5060
